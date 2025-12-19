@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { 
   Settings, Calendar, CheckCircle2, ShieldAlert,
-  LogOut, Menu, X, ChevronRight
+  LogOut, Menu, X, ChevronRight, Maximize2
 } from 'lucide-react';
 import { UserRole } from '../types';
 
@@ -34,6 +34,11 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, logoUrl, role, 
   const navigate = (id: any) => {
     setView(id);
     setIsOpen(false);
+  };
+
+  const handleFullScreen = () => {
+    // Abre a URL atual (seja do iframe ou direta) em uma nova aba
+    window.open(window.location.href, '_blank');
   };
 
   return (
@@ -92,13 +97,23 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, logoUrl, role, 
           })}
         </nav>
 
-        <div className="p-6 border-t border-zinc-900 space-y-4">
+        <div className="p-6 border-t border-zinc-900 space-y-3">
+          {/* Botão Tela Cheia */}
+          <button 
+            onClick={handleFullScreen}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-zinc-200 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 transition-all font-bold text-xs"
+            title="Abrir em uma nova aba"
+          >
+            <Maximize2 size={18} className="text-red-600" /> TELA CHEIA
+          </button>
+
           <button 
             onClick={onLogout}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-zinc-600 hover:bg-red-950/20 hover:text-red-500 transition-all font-bold text-xs"
           >
             <LogOut size={18} /> SAIR DA CONTA
           </button>
+          
           <div className="text-center">
             <p className="text-[10px] uppercase tracking-widest text-zinc-800 font-black">Insanus v2.0-PRO</p>
           </div>
