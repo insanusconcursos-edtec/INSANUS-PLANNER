@@ -1,12 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Plus, Trash2, ChevronUp, ChevronDown, FileText, 
   Image as ImageIcon, Link as LinkIcon, RefreshCw, 
   Clock, GraduationCap, Folder as FolderIcon, 
   Users, Code, Search, UserPlus, Key, ShieldCheck,
   Calendar, Edit, X, Save, Layers, Settings2, ExternalLink,
-  Lock, CheckCircle2, AlertCircle, Copy
+  Lock, CheckCircle2, AlertCircle, Copy, Upload, FileImage
 } from 'lucide-react';
 import { StudyPlan, Discipline, Topic, Goal, GoalType, CycleSystem, StudyCycle, Folder, RegisteredUser, PlanAccess } from '../types.ts';
 import { GOAL_COLORS } from '../constants.tsx';
@@ -29,6 +29,9 @@ const AdminView: React.FC<AdminViewProps> = ({ plans, updatePlans, users, update
   const [editingUser, setEditingUser] = useState<RegisteredUser | null>(null);
   const [isManagingAccess, setIsManagingAccess] = useState<string | null>(null);
   
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const planImageInputRef = useRef<HTMLInputElement>(null);
+
   // UI States for Plan Editor
   const [isEditingGoal, setIsEditingGoal] = useState<{ dId: string, tId: string, gId: string | null } | null>(null);
 
@@ -59,6 +62,39 @@ const AdminView: React.FC<AdminViewProps> = ({ plans, updatePlans, users, update
     };
     await savePlan(newPlan);
     setSelectedPlanId(id);
+  };
+
+  const handleFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const base64 = await handleFileToBase64(file);
+        updateLogo(base64);
+      } catch (err) {
+        alert("Erro ao processar imagem da logo.");
+      }
+    }
+  };
+
+  const handlePlanImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && activePlan) {
+      try {
+        const base64 = await handleFileToBase64(file);
+        savePlan({ ...activePlan, imageUrl: base64 });
+      } catch (err) {
+        alert("Erro ao processar imagem do plano.");
+      }
+    }
   };
 
   const addDiscipline = async () => {
@@ -207,23 +243,48 @@ const AdminView: React.FC<AdminViewProps> = ({ plans, updatePlans, users, update
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-            <div className="space-y-4">
-              <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">URL da Logomarca (Transparente)</label>
-              <div className="flex gap-2">
-                <input 
-                  type="text" 
-                  value={logoUrl} 
-                  onChange={(e) => updateLogo(e.target.value)}
-                  className="flex-1 bg-zinc-950 border border-zinc-800 rounded-2xl px-6 py-4 text-white focus:border-red-500 outline-none transition-all"
-                  placeholder="Ex: https://dominio.com/logo.png"
-                />
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Logo do Sistema</label>
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      value={logoUrl.startsWith('data:') ? 'Imagem carregada localmente' : logoUrl} 
+                      onChange={(e) => updateLogo(e.target.value)}
+                      readOnly={logoUrl.startsWith('data:')}
+                      className="flex-1 bg-zinc-950 border border-zinc-800 rounded-2xl px-6 py-4 text-white text-xs focus:border-red-500 outline-none transition-all"
+                      placeholder="URL ou carregue um arquivo"
+                    />
+                    <button 
+                      onClick={() => logoInputRef.current?.click()}
+                      className="bg-zinc-800 hover:bg-zinc-700 p-4 rounded-2xl text-zinc-400 hover:text-white transition-all border border-zinc-700"
+                      title="Upload de arquivo"
+                    >
+                      <Upload size={20} />
+                    </button>
+                    <input 
+                      type="file" 
+                      ref={logoInputRef} 
+                      className="hidden" 
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                    />
+                  </div>
+                  <div className="flex items-start gap-2 text-[10px] font-bold text-zinc-600 uppercase">
+                    <AlertCircle size={12} className="mt-0.5" />
+                    <span>Tamanho recomendado: 512x512px (PNG Transparente preferencialmente).</span>
+                  </div>
+                  {logoUrl.startsWith('data:') && (
+                    <button onClick={() => updateLogo('')} className="text-[9px] font-black text-red-500 uppercase hover:underline">Remover arquivo local</button>
+                  )}
+                </div>
               </div>
-              <p className="text-[10px] text-zinc-600 italic">As mudanças são aplicadas instantaneamente para todos os alunos.</p>
             </div>
             <div className="flex flex-col items-center justify-center p-12 bg-zinc-950 rounded-[2.5rem] border border-zinc-800 border-dashed">
               <span className="text-[10px] font-bold text-zinc-700 uppercase mb-6">Pré-visualização da Logo</span>
-              <div className="p-6 bg-zinc-900 rounded-2xl border border-zinc-800">
-                <img src={logoUrl} alt="Logo Preview" className="max-w-[120px] max-h-[120px] object-contain" />
+              <div className="p-6 bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl">
+                <img src={logoUrl || 'https://via.placeholder.com/120?text=LOGO'} alt="Logo Preview" className="max-w-[120px] max-h-[120px] object-contain" />
               </div>
             </div>
           </div>
@@ -389,23 +450,42 @@ const AdminView: React.FC<AdminViewProps> = ({ plans, updatePlans, users, update
                       <FileText size={180} />
                     </div>
                     <div className="flex justify-between items-start relative z-10">
-                      <div className="flex-1">
+                      <div className="flex-1 space-y-6">
                         <input 
                           value={activePlan.name}
                           onChange={(e) => savePlan({ ...activePlan, name: e.target.value })}
                           className="text-4xl font-black bg-transparent border-none focus:ring-0 text-white w-full outline-none uppercase tracking-tighter"
                         />
-                        <div className="mt-6 flex flex-wrap items-center gap-6">
-                           <div className="flex items-center gap-2 text-zinc-500 bg-zinc-950 px-4 py-2.5 rounded-2xl border border-zinc-800">
-                             <ImageIcon size={14} className="text-red-500" />
-                             <input 
-                               value={activePlan.imageUrl}
-                               onChange={(e) => savePlan({ ...activePlan, imageUrl: e.target.value })}
-                               className="text-[10px] font-bold bg-transparent outline-none w-56"
-                               placeholder="URL da Capa do Plano"
-                             />
+                        <div className="flex flex-wrap items-center gap-6">
+                           <div className="space-y-2">
+                             <div className="flex items-center gap-2 text-zinc-500 bg-zinc-950 px-4 py-2.5 rounded-2xl border border-zinc-800">
+                               <FileImage size={14} className="text-red-500" />
+                               <input 
+                                 value={activePlan.imageUrl.startsWith('data:') ? 'Imagem Local' : activePlan.imageUrl}
+                                 onChange={(e) => savePlan({ ...activePlan, imageUrl: e.target.value })}
+                                 readOnly={activePlan.imageUrl.startsWith('data:')}
+                                 className="text-[10px] font-bold bg-transparent outline-none w-56"
+                                 placeholder="URL da Capa ou carregar"
+                               />
+                               <button 
+                                 onClick={() => planImageInputRef.current?.click()}
+                                 className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-400 transition-all"
+                                 title="Upload capa local"
+                               >
+                                 <Upload size={16} />
+                               </button>
+                               <input 
+                                 type="file" 
+                                 ref={planImageInputRef} 
+                                 className="hidden" 
+                                 accept="image/*"
+                                 onChange={handlePlanImageUpload}
+                               />
+                             </div>
+                             <div className="text-[9px] font-bold text-zinc-600 uppercase ml-2">Recomendado: 1200x600px (Proporção 2:1)</div>
                            </div>
-                           <div className="flex items-center gap-2 text-zinc-500 bg-zinc-950 px-4 py-2.5 rounded-2xl border border-zinc-800">
+
+                           <div className="flex items-center gap-2 text-zinc-500 bg-zinc-950 px-4 py-2.5 rounded-2xl border border-zinc-800 h-fit self-start">
                              <Settings2 size={14} className="text-red-500" />
                              <select 
                                value={activePlan.cycleSystem}
