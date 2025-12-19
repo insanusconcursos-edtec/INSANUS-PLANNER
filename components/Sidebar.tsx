@@ -60,8 +60,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, logoUrl, role, 
         md:translate-x-0 overflow-y-auto scrollbar-hide
       `}>
         <div className="p-8 flex flex-col items-center shrink-0">
-          <div className="w-20 h-20 rounded-2xl bg-zinc-900 border border-zinc-800 p-3 shadow-2xl mb-4 relative overflow-hidden group">
-            <div className="absolute inset-0 bg-red-600/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="w-20 h-20 mb-4 relative overflow-hidden group">
+            <div className="absolute inset-0 bg-red-600/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
             <img src={logoUrl} alt="Logo" className="w-full h-full object-contain relative z-10" />
           </div>
           <h1 className="text-xl font-black tracking-tighter text-white">CONCURSEIRO<span className="text-red-600">PRO</span></h1>

@@ -283,8 +283,8 @@ const AdminView: React.FC<AdminViewProps> = ({ plans, updatePlans, users, update
             </div>
             <div className="flex flex-col items-center justify-center p-12 bg-zinc-950 rounded-[2.5rem] border border-zinc-800 border-dashed">
               <span className="text-[10px] font-bold text-zinc-700 uppercase mb-6">Pré-visualização da Logo</span>
-              <div className="p-6 bg-zinc-900 rounded-2xl border border-zinc-800 shadow-2xl">
-                <img src={logoUrl || 'https://via.placeholder.com/120?text=LOGO'} alt="Logo Preview" className="max-w-[120px] max-h-[120px] object-contain" />
+              <div className="w-[120px] h-[120px] shadow-2xl">
+                <img src={logoUrl || 'https://via.placeholder.com/120?text=LOGO'} alt="Logo Preview" className="w-full h-full object-contain" />
               </div>
             </div>
           </div>

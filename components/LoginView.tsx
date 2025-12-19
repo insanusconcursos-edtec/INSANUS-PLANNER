@@ -35,7 +35,7 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, logoUrl }) => {
       
       <div className="w-full max-w-md space-y-8 relative z-10">
         <div className="flex flex-col items-center">
-          <div className="w-24 h-24 rounded-3xl bg-zinc-900 border border-zinc-800 p-4 mb-6 shadow-2xl animate-pulse-slow">
+          <div className="w-24 h-24 mb-6 shadow-2xl animate-pulse-slow">
             <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
           </div>
           <h1 className="text-4xl font-black tracking-tighter text-white text-center">
