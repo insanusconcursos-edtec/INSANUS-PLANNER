@@ -1,0 +1,7 @@
+{
+  "name": "Concurseiro Pro: Sistema de Planejamento",
+  "description": "Uma plataforma avançada de gestão de estudos para concursos, com ciclos automatizados, revisões espaçadas e cronograma inteligente.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

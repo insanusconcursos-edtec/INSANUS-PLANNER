@@ -1,0 +1,97 @@
+
+import React, { useState } from 'react';
+import { ShieldCheck, User, Lock, ArrowRight, Zap } from 'lucide-react';
+import { RegisteredUser } from '../types';
+
+interface LoginViewProps {
+  onLogin: (email: string, pass: string) => void;
+  logoUrl: string;
+}
+
+const LoginView: React.FC<LoginViewProps> = ({ onLogin, logoUrl }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setTimeout(() => {
+      onLogin(email, password);
+      setLoading(false);
+    }, 800);
+  };
+
+  return (
+    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      {/* Background Decor */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-red-600/10 blur-[120px] rounded-full pointer-events-none" />
+      
+      <div className="w-full max-w-md space-y-8 relative z-10">
+        <div className="flex flex-col items-center">
+          <div className="w-24 h-24 rounded-3xl bg-zinc-900 border border-zinc-800 p-4 mb-6 shadow-2xl animate-pulse-slow">
+            <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+          </div>
+          <h1 className="text-4xl font-black tracking-tighter text-white text-center">
+            CONCURSEIRO<span className="text-red-600">PRO</span>
+          </h1>
+          <p className="text-zinc-500 text-sm mt-2 font-medium">Acesso Restrito ao Ecossistema</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="bg-zinc-900/40 border border-zinc-800/60 p-8 rounded-[2.5rem] backdrop-blur-xl shadow-2xl space-y-6">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Endereço de E-mail</label>
+              <div className="relative group">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-700 group-focus-within:text-red-500 transition-colors" size={18} />
+                <input 
+                  type="email" 
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="admin@exemplo.com"
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl pl-12 pr-4 py-4 text-white focus:border-red-600 outline-none transition-all placeholder:text-zinc-800"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Senha de Acesso</label>
+              <div className="relative group">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-700 group-focus-within:text-red-500 transition-colors" size={18} />
+                <input 
+                  type="password" 
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl pl-12 pr-4 py-4 text-white focus:border-red-600 outline-none transition-all placeholder:text-zinc-800"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="w-full bg-red-600 hover:bg-red-700 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg shadow-red-600/30 group disabled:opacity-50"
+          >
+            {loading ? <Zap className="animate-spin" size={20} /> : (
+              <>
+                ENTRAR NO SISTEMA
+                <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+              </>
+            )}
+          </button>
+        </form>
+
+        <div className="flex items-center justify-center gap-4 text-[10px] font-bold text-zinc-700 uppercase tracking-[0.2em]">
+          <ShieldCheck size={14} />
+          <span>Ambiente Criptografado</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default LoginView;
