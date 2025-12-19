@@ -1,18 +1,18 @@
 
 import React, { useState, useEffect } from 'react';
-import Sidebar from './components/Sidebar';
-import AdminView from './components/AdminView';
-import RoutineView from './components/RoutineView';
-import PlanningView from './components/PlanningView';
-import DailyGoalsView from './components/DailyGoalsView';
-import LoginView from './components/LoginView';
-import { AppState, StudyPlan, UserRoutine, PlanningEntry, RegisteredUser, Goal } from './types';
-import { INITIAL_LOGO } from './constants';
-import { generatePlanning } from './services/scheduler';
+import Sidebar from './components/Sidebar.tsx';
+import AdminView from './components/AdminView.tsx';
+import RoutineView from './components/RoutineView.tsx';
+import PlanningView from './components/PlanningView.tsx';
+import DailyGoalsView from './components/DailyGoalsView.tsx';
+import LoginView from './components/LoginView.tsx';
+import { AppState, StudyPlan, UserRoutine, PlanningEntry, RegisteredUser, Goal } from './types.ts';
+import { INITIAL_LOGO } from './constants.tsx';
+import { generatePlanning } from './services/scheduler.ts';
 import { Eye, ShieldAlert, Loader2 } from 'lucide-react';
 
 // Firebase Imports
-import { auth, db } from './firebase';
+import { auth, db } from './firebase.ts';
 import { 
   doc, 
   getDoc, 
@@ -173,7 +173,6 @@ const App: React.FC = () => {
       e.id === entryId ? { ...e, status: 'COMPLETED' as const, actualTimeSpent: timeSpent } : e
     );
 
-    // Review logic: if completed goal has reviewConfig, schedule first/next review
     const plan = state.admin.plans.find(p => p.id === state.user.routine.selectedPlanId);
     const goal = plan?.disciplines.find(d => d.id === entry.disciplineId)?.topics.find(t => t.id === entry.topicId)?.goals.find(g => g.id === entry.goalId);
 
@@ -199,7 +198,7 @@ const App: React.FC = () => {
           topicId: entry.topicId,
           disciplineId: entry.disciplineId,
           date: reviewDate.toISOString(),
-          durationMinutes: 30, // Default review time or admin defined if we expand
+          durationMinutes: 30,
           status: 'PENDING',
           isReview: true,
           reviewStep: nextStep
