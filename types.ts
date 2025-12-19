@@ -12,7 +12,7 @@ export enum GoalType {
 
 export interface ReviewConfig {
   enabled: boolean;
-  intervals: number[];
+  intervals: number[]; // e.g. [1, 7, 15, 30]
   repeatLast: boolean;
 }
 
@@ -22,13 +22,13 @@ export interface Goal {
   title: string;
   color: string;
   order: number;
-  minutes?: number;
-  pages?: number;
+  minutes?: number; // Para Aulas e Resumo
+  pages?: number;   // Para Material, Questões e Lei Seca
   links: string[];
-  articles?: string;
-  multiplier?: number;
+  articles?: string; // Para Lei Seca
+  multiplier?: number; // Para Lei Seca (2x, 3x, etc)
   reviewConfig?: ReviewConfig;
-  referencedGoals?: string[];
+  referencedGoalIds?: string[]; // Para Resumo (quais metas ele resume)
 }
 
 export interface Topic {
@@ -96,7 +96,7 @@ export interface RegisteredUser {
 }
 
 export interface UserRoutine {
-  days: { [key: number]: number };
+  days: { [key: number]: number }; // dayIndex: minutes
   profile: UserProfile;
   selectedPlanId: string | null;
 }
@@ -110,7 +110,7 @@ export interface PlanningEntry {
   durationMinutes: number;
   status: 'PENDING' | 'COMPLETED' | 'DELAYED';
   isReview: boolean;
-  reviewStep?: number;
+  reviewStep?: number; // 0 for 1st review, 1 for 2nd...
   actualTimeSpent?: number;
 }
 

@@ -6,7 +6,7 @@ import RoutineView from './components/RoutineView';
 import PlanningView from './components/PlanningView';
 import DailyGoalsView from './components/DailyGoalsView';
 import LoginView from './components/LoginView';
-import { AppState, StudyPlan, UserRoutine, PlanningEntry, RegisteredUser } from './types';
+import { AppState, StudyPlan, UserRoutine, PlanningEntry, RegisteredUser, Goal } from './types';
 import { INITIAL_LOGO } from './constants';
 import { generatePlanning } from './services/scheduler';
 import { Eye, ShieldAlert, Loader2 } from 'lucide-react';
@@ -49,11 +49,9 @@ const App: React.FC = () => {
     }
   });
 
-  // 1. Monitorar Autenticação
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // Se for admin
         if (user.email === ADMIN_CREDENTIALS.email) {
           const adminUser: RegisteredUser = {
             id: user.uid,
@@ -67,7 +65,6 @@ const App: React.FC = () => {
           setState(prev => ({ ...prev, auth: { currentUser: adminUser, isAuthenticated: true } }));
           setCurrentView('admin');
         } else {
-          // Buscar dados do usuário no Firestore
           const userDoc = await getDoc(doc(db, "users", user.uid));
           if (userDoc.exists()) {
             const userData = userDoc.data() as RegisteredUser;
@@ -82,17 +79,12 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  // 2. Sincronizar Dados Globais (Planos e Logo)
   useEffect(() => {
     if (!state.auth.isAuthenticated) return;
-
-    // Listen to Plans
     const unsubPlans = onSnapshot(collection(db, "plans"), (snapshot) => {
       const plans = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as StudyPlan));
       setState(prev => ({ ...prev, admin: { ...prev.admin, plans } }));
     });
-
-    // Listen to Users (if Admin)
     let unsubUsers = () => {};
     if (state.auth.currentUser?.role === 'ADMIN') {
       unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
@@ -100,21 +92,16 @@ const App: React.FC = () => {
         setState(prev => ({ ...prev, admin: { ...prev.admin, users } }));
       });
     }
-
-    // Listen to Global Config
     const unsubConfig = onSnapshot(doc(db, "config", "global"), (doc) => {
       if (doc.exists()) {
         setState(prev => ({ ...prev, admin: { ...prev.admin, logoUrl: doc.data().logoUrl } }));
       }
     });
-
     return () => { unsubPlans(); unsubUsers(); unsubConfig(); };
   }, [state.auth.isAuthenticated]);
 
-  // 3. Sincronizar Progresso do Usuário
   useEffect(() => {
     if (!state.auth.isAuthenticated || !state.auth.currentUser) return;
-
     const uid = state.auth.currentUser.id;
     const unsubProgress = onSnapshot(doc(db, "user_progress", uid), (doc) => {
       if (doc.exists()) {
@@ -129,7 +116,6 @@ const App: React.FC = () => {
         }));
       }
     });
-
     return () => unsubProgress();
   }, [state.auth.isAuthenticated, state.auth.currentUser?.id]);
 
@@ -150,9 +136,6 @@ const App: React.FC = () => {
   };
 
   const handleUpdatePlans = async (plans: StudyPlan[]) => {
-    // No Firestore, atualizamos cada plano individualmente ou a coleção
-    // Aqui para simplificar, o AdminView já deve lidar com addDoc/setDoc
-    // Mas vamos atualizar o estado local para feedback imediato
     setState(prev => ({ ...prev, admin: { ...prev.admin, plans } }));
   };
 
@@ -161,7 +144,6 @@ const App: React.FC = () => {
   };
 
   const handleUpdateUsers = async (users: RegisteredUser[]) => {
-    // O AdminView deve lidar com as chamadas de banco para cada usuário
     setState(prev => ({ ...prev, admin: { ...prev.admin, users } }));
   };
 
@@ -176,16 +158,56 @@ const App: React.FC = () => {
       alert("Selecione um plano!");
       return;
     }
-    const newPlanning = generatePlanning(selectedPlan, state.user.routine);
+    const newPlanning = generatePlanning(selectedPlan, state.user.routine, new Date(), state.user.planning);
     await setDoc(doc(db, "user_progress", state.auth.currentUser.id), { planning: newPlanning }, { merge: true });
     setCurrentView('planning');
   };
 
   const handleCompleteGoal = async (entryId: string, timeSpent: number) => {
     if (!state.auth.currentUser) return;
-    const updatedPlanning = state.user.planning.map(e => 
+    
+    const entry = state.user.planning.find(e => e.id === entryId);
+    if (!entry) return;
+
+    let updatedPlanning = state.user.planning.map(e => 
       e.id === entryId ? { ...e, status: 'COMPLETED' as const, actualTimeSpent: timeSpent } : e
     );
+
+    // Review logic: if completed goal has reviewConfig, schedule first/next review
+    const plan = state.admin.plans.find(p => p.id === state.user.routine.selectedPlanId);
+    const goal = plan?.disciplines.find(d => d.id === entry.disciplineId)?.topics.find(t => t.id === entry.topicId)?.goals.find(g => g.id === entry.goalId);
+
+    if (goal?.reviewConfig?.enabled) {
+      const currentStep = entry.reviewStep ?? -1;
+      const nextStep = currentStep + 1;
+      const intervals = goal.reviewConfig.intervals;
+      
+      let daysToAdd = 0;
+      if (nextStep < intervals.length) {
+        daysToAdd = intervals[nextStep];
+      } else if (goal.reviewConfig.repeatLast && intervals.length > 0) {
+        daysToAdd = intervals[intervals.length - 1];
+      }
+
+      if (daysToAdd > 0) {
+        const reviewDate = new Date();
+        reviewDate.setDate(reviewDate.getDate() + daysToAdd);
+        
+        const reviewEntry: PlanningEntry = {
+          id: Math.random().toString(36).substr(2, 9),
+          goalId: entry.goalId,
+          topicId: entry.topicId,
+          disciplineId: entry.disciplineId,
+          date: reviewDate.toISOString(),
+          durationMinutes: 30, // Default review time or admin defined if we expand
+          status: 'PENDING',
+          isReview: true,
+          reviewStep: nextStep
+        };
+        updatedPlanning.push(reviewEntry);
+      }
+    }
+
     await setDoc(doc(db, "user_progress", state.auth.currentUser.id), { planning: updatedPlanning }, { merge: true });
   };
 

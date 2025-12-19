@@ -32,28 +32,24 @@ const getDisciplinesFromCycleItems = (plan: StudyPlan, items: CycleItem[]): stri
     if (item.type === 'DISCIPLINE') {
       disciplineIds.push(item.id);
     } else {
-      // Expand folder: find disciplines belonging to this folder, sorted by their position in plan.disciplines
       const folderDisciplines = plan.disciplines
         .filter(d => d.folderId === item.id)
         .map(d => d.id);
       disciplineIds.push(...folderDisciplines);
     }
   });
-  // Remove duplicates while preserving order
   return [...new Set(disciplineIds)];
 };
 
 export const generatePlanning = (
   plan: StudyPlan,
   routine: UserRoutine,
-  startDate: Date = new Date()
+  startDate: Date = new Date(),
+  existingPlanning: PlanningEntry[] = []
 ): PlanningEntry[] => {
   if (!plan) return [];
 
-  const entries: PlanningEntry[] = [];
   const allOrderedGoals: { goal: Goal; topicId: string; disciplineId: string }[] = [];
-
-  // Flatten goals based on Cycles and sorting
   const sortedCycles = [...plan.cycles].sort((a, b) => a.order - b.order);
 
   if (plan.cycleSystem === CycleSystem.CONTINUOUS) {
@@ -62,8 +58,8 @@ export const generatePlanning = (
       disciplinesInCycle.forEach(dId => {
         const discipline = plan.disciplines.find(d => d.id === dId);
         if (discipline) {
-          discipline.topics.forEach(topic => {
-            topic.goals.forEach(goal => {
+          discipline.topics.sort((a,b) => a.order - b.order).forEach(topic => {
+            topic.goals.sort((a,b) => a.order - b.order).forEach(goal => {
               allOrderedGoals.push({ goal, topicId: topic.id, disciplineId: discipline.id });
             });
           });
@@ -73,7 +69,7 @@ export const generatePlanning = (
   } else {
     // Rotating System
     let hasMore = true;
-    let topicOffsetMap: Record<string, number> = {}; // disciplineId -> count
+    let topicOffsetMap: Record<string, number> = {}; 
 
     while (hasMore) {
       hasMore = false;
@@ -83,11 +79,14 @@ export const generatePlanning = (
           const discipline = plan.disciplines.find(d => d.id === dId);
           if (discipline) {
             const start = topicOffsetMap[dId] || 0;
-            const topicsToTake = discipline.topics.slice(start, start + cycle.topicsPerDiscipline);
+            const topicsToTake = discipline.topics
+              .sort((a,b) => a.order - b.order)
+              .slice(start, start + cycle.topicsPerDiscipline);
+              
             if (topicsToTake.length > 0) {
               hasMore = true;
               topicsToTake.forEach(topic => {
-                topic.goals.forEach(goal => {
+                topic.goals.sort((a,b) => a.order - b.order).forEach(goal => {
                   allOrderedGoals.push({ goal, topicId: topic.id, disciplineId: discipline.id });
                 });
               });
@@ -99,14 +98,27 @@ export const generatePlanning = (
     }
   }
 
-  // Distribute over days
+  // Preserve already completed goals and reviews
+  const completedEntries = existingPlanning.filter(e => e.status === 'COMPLETED' || e.isReview);
+  
+  // Start distribution logic
   let currentDate = new Date(startDate);
   currentDate.setHours(0, 0, 0, 0);
   
+  const finalEntries: PlanningEntry[] = [...completedEntries];
+  
+  // Only distribute pending base goals
+  // Find which base goals are already completed
+  const completedGoalIds = new Set(completedEntries.filter(e => !e.isReview).map(e => e.goalId));
+  const pendingBaseGoals = allOrderedGoals.filter(item => !completedGoalIds.has(item.goal.id));
+
   let currentGoalIndex = 0;
   let remainingMinutesFromGoal = 0;
 
-  while (currentGoalIndex < allOrderedGoals.length) {
+  // Review logic: Add reviews based on completion dates
+  // This scheduler handles initial plan. Dynamic reviews are added by App.tsx upon completion.
+  
+  while (currentGoalIndex < pendingBaseGoals.length) {
     const dayOfWeek = currentDate.getDay();
     const availableMinutesToday = routine.days[dayOfWeek] || 0;
 
@@ -116,21 +128,26 @@ export const generatePlanning = (
     }
 
     let spentToday = 0;
-    while (spentToday < availableMinutesToday && currentGoalIndex < allOrderedGoals.length) {
-      const { goal, topicId, disciplineId } = allOrderedGoals[currentGoalIndex];
+    
+    // Check if there are scheduled reviews for today first (priority)
+    const reviewsForToday = completedEntries.filter(e => e.isReview && e.status === 'PENDING' && e.date.split('T')[0] === currentDate.toISOString().split('T')[0]);
+    reviewsForToday.forEach(rev => { spentToday += rev.durationMinutes; });
+
+    while (spentToday < availableMinutesToday && currentGoalIndex < pendingBaseGoals.length) {
+      const { goal, topicId, disciplineId } = pendingBaseGoals[currentGoalIndex];
       const fullDuration = calculateGoalDuration(goal, routine.profile);
       const needed = remainingMinutesFromGoal > 0 ? remainingMinutesFromGoal : fullDuration;
       
       const canDo = Math.min(needed, availableMinutesToday - spentToday);
 
       if (canDo > 0) {
-        entries.push({
+        finalEntries.push({
           id: Math.random().toString(36).substr(2, 9),
           goalId: goal.id,
           topicId,
           disciplineId,
           date: currentDate.toISOString(),
-          durationMinutes: canDo,
+          durationMinutes: Math.round(canDo),
           status: 'PENDING',
           isReview: false
         });
@@ -138,21 +155,19 @@ export const generatePlanning = (
         spentToday += canDo;
         const stillNeeded = needed - canDo;
         
-        if (stillNeeded <= 0) {
+        if (stillNeeded < 1) { // Close enough to zero
           currentGoalIndex++;
           remainingMinutesFromGoal = 0;
         } else {
           remainingMinutesFromGoal = stillNeeded;
         }
       } else {
-        break; // Day full
+        break; 
       }
     }
     currentDate.setDate(currentDate.getDate() + 1);
-    
-    // Safety break
-    if (entries.length > 2000) break; 
+    if (finalEntries.length > 5000) break; 
   }
 
-  return entries;
+  return finalEntries.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 };
