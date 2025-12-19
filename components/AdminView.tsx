@@ -165,8 +165,7 @@ const AdminView: React.FC<AdminViewProps> = ({ plans, updatePlans, users, update
     await setDoc(doc(db, "users", userId), { accessList: newAccessList }, { merge: true });
   };
 
-  // Melhoria na altura do Embed: Deixando fixo em 850px para garantir que caiba o planejamento completo
-  const embedCode = `<div style="width: 100%; height: 850px; max-height: 95vh; overflow: hidden; background: #0a0a0a; border-radius: 24px; border: 1px solid #27272a; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
+  const embedCode = `<div style="width: 100%; height: 850px; max-height: 100vh; overflow: hidden; background: #0a0a0a; border-radius: 24px; border: 1px solid #27272a; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
   <iframe src="${window.location.origin}" style="width: 100%; height: 100%; border:0;" allow="camera; microphone; geolocation" allowfullscreen></iframe>
 </div>`;
 
@@ -243,7 +242,8 @@ const AdminView: React.FC<AdminViewProps> = ({ plans, updatePlans, users, update
           </div>
           <p className="text-zinc-400 text-sm leading-relaxed">
             Utilize o código abaixo para embutir a plataforma de estudos em sua área de membros. 
-            O código foi configurado com uma altura de <span className="text-white font-bold">850px</span> para garantir que o calendário e as metas fiquem visíveis sem cortes excessivos.
+            O código foi configurado com uma altura de <span className="text-white font-bold">850px</span>. 
+            A aplicação possui barras de rolagem internas para garantir que nada seja cortado.
           </p>
           <div className="relative group">
             <div className="absolute -inset-1 bg-gradient-to-r from-red-600/20 to-zinc-800/20 rounded-3xl blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
@@ -251,7 +251,7 @@ const AdminView: React.FC<AdminViewProps> = ({ plans, updatePlans, users, update
               {embedCode}
             </pre>
             <button 
-              onClick={() => { navigator.clipboard.writeText(embedCode); alert("Código copiado para a área de transferência!"); }}
+              onClick={() => { navigator.clipboard.writeText(embedCode); alert("Código copiado!"); }}
               className="absolute top-6 right-6 bg-red-600 hover:bg-red-500 p-3 rounded-xl text-white shadow-xl transition-all flex items-center gap-2 font-bold text-[10px] uppercase"
             >
               <Copy size={16} /> Copiar Código
@@ -260,7 +260,7 @@ const AdminView: React.FC<AdminViewProps> = ({ plans, updatePlans, users, update
           <div className="bg-zinc-950/50 p-6 rounded-2xl border border-zinc-800 flex items-start gap-3">
             <AlertCircle className="text-zinc-600 shrink-0" size={20} />
             <p className="text-zinc-500 text-xs">
-              <strong>Dica:</strong> Se precisar de uma altura ainda maior, você pode alterar o valor de <code className="text-zinc-300">height: 850px</code> para o valor desejado no código acima.
+              <strong>Atenção:</strong> Os botões internos da barra lateral foram otimizados para não serem cortados. O aluno também pode usar o botão "ABRIR EM OUTRA GUIA" para visualizar o sistema fora do iFrame.
             </p>
           </div>
         </div>
@@ -419,7 +419,7 @@ const AdminView: React.FC<AdminViewProps> = ({ plans, updatePlans, users, update
                         </div>
                       </div>
                       <button onClick={async () => {
-                        if(confirm("ATENÇÃO: Deseja apagar este plano e TODAS as suas disciplinas permanentemente?")) {
+                        if(confirm("ATENÇÃO: Deseja apagar este plano?")) {
                           await deleteDoc(doc(db, "plans", activePlan.id));
                           setSelectedPlanId(null);
                         }
@@ -494,11 +494,6 @@ const AdminView: React.FC<AdminViewProps> = ({ plans, updatePlans, users, update
                                 </button>
                               </div>
                             ))}
-                            {disc.topics.length === 0 && (
-                              <div className="col-span-full py-12 text-center border-2 border-dashed border-zinc-900 rounded-[2rem]">
-                                <p className="text-zinc-800 font-black uppercase text-[10px] tracking-widest">Nenhum assunto cadastrado.</p>
-                              </div>
-                            )}
                           </div>
                         </div>
                       ))}
@@ -511,10 +506,7 @@ const AdminView: React.FC<AdminViewProps> = ({ plans, updatePlans, users, update
                     <div className="absolute inset-0 bg-red-600 blur-[80px] opacity-10 animate-pulse" />
                     <FileText size={100} className="relative z-10 opacity-10" />
                   </div>
-                  <div className="text-center space-y-2">
-                    <p className="font-black uppercase tracking-[0.5em] text-[10px] text-zinc-700">Selecione um plano de estudos</p>
-                    <p className="text-[10px] text-zinc-800 font-bold uppercase tracking-widest">Ou crie um novo para gerenciar</p>
-                  </div>
+                  <p className="font-black uppercase tracking-[0.5em] text-[10px] text-zinc-700">Selecione um plano</p>
                 </div>
               )}
            </div>
@@ -528,44 +520,33 @@ const AdminView: React.FC<AdminViewProps> = ({ plans, updatePlans, users, update
               <div className="p-10 border-b border-zinc-800 flex justify-between items-center bg-zinc-950/50 shrink-0">
                 <div>
                   <h4 className="text-3xl font-black text-white uppercase tracking-tighter">Planos Disponíveis</h4>
-                  <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mt-1">Habilite ou revogue acessos individuais</p>
+                  <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mt-1">Liberar acessos</p>
                 </div>
                 <button onClick={() => setIsManagingAccess(null)} className="p-4 hover:bg-zinc-800 rounded-2xl transition-all"><X size={28} className="text-zinc-500" /></button>
               </div>
               <div className="p-10 space-y-4 overflow-y-auto flex-1">
-                {plans.length > 0 ? plans.map(plan => {
+                {plans.map(plan => {
                   const user = users.find(u => u.id === isManagingAccess);
                   const hasAccess = user?.accessList.some(a => a.planId === plan.id);
                   return (
-                    <div key={plan.id} className="flex items-center justify-between p-6 bg-zinc-950 rounded-3xl border border-zinc-800 hover:border-zinc-700 transition-all group">
+                    <div key={plan.id} className="flex items-center justify-between p-6 bg-zinc-950 rounded-3xl border border-zinc-800">
                       <div className="flex items-center gap-5">
-                        <img src={plan.imageUrl} className="w-14 h-14 rounded-2xl object-cover shadow-lg group-hover:scale-105 transition-transform" />
+                        <img src={plan.imageUrl} className="w-14 h-14 rounded-2xl object-cover" />
                         <div>
                           <div className="font-black text-sm uppercase text-white tracking-tight">{plan.name}</div>
-                          <div className={`text-[9px] font-black uppercase tracking-widest mt-1 ${hasAccess ? 'text-green-500' : 'text-zinc-700'}`}>
-                            {hasAccess ? 'Acesso Permitido' : 'Sem Autorização'}
-                          </div>
                         </div>
                       </div>
                       <button 
                         onClick={() => togglePlanAccess(isManagingAccess!, plan.id)}
                         className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                          hasAccess ? 'bg-red-600 text-white shadow-lg shadow-red-600/20' : 'bg-zinc-800 text-zinc-500 hover:bg-zinc-700 hover:text-white'
+                          hasAccess ? 'bg-red-600 text-white' : 'bg-zinc-800 text-zinc-500'
                         }`}
                       >
                         {hasAccess ? 'Revogar' : 'Liberar'}
                       </button>
                     </div>
                   );
-                }) : (
-                  <div className="text-center py-20">
-                    <AlertCircle size={48} className="mx-auto text-zinc-800 mb-6 opacity-20" />
-                    <p className="text-zinc-600 font-black uppercase text-[10px] tracking-widest">Nenhum plano disponível para vincular.</p>
-                  </div>
-                )}
-              </div>
-              <div className="p-10 bg-zinc-950/80 text-center border-t border-zinc-800 shrink-0">
-                 <p className="text-[9px] text-zinc-600 uppercase font-black tracking-[0.3em]">Gerenciamento de licenças do aluno • 365 dias de vigência</p>
+                })}
               </div>
            </div>
         </div>
@@ -605,7 +586,6 @@ const GoalEditorModal = ({ activePlan, context, onClose, onSave }: any) => {
         <div className="p-10 border-b border-zinc-800 flex justify-between items-center sticky top-0 bg-zinc-900/80 backdrop-blur-md z-10 shrink-0">
           <div>
             <h4 className="text-3xl font-black text-white uppercase tracking-tighter">Configuração da Meta</h4>
-            <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mt-1">Defina os parâmetros técnicos de estudo</p>
           </div>
           <button onClick={onClose} className="p-4 hover:bg-zinc-800 rounded-2xl transition-all"><X size={32} className="text-zinc-500" /></button>
         </div>
@@ -613,7 +593,7 @@ const GoalEditorModal = ({ activePlan, context, onClose, onSave }: any) => {
         <div className="p-10 space-y-10 flex-1 overflow-y-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             <div className="space-y-4">
-              <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Selecione o Tipo</label>
+              <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Tipo</label>
               <div className="grid grid-cols-2 gap-3">
                 {Object.values(GoalType).map(type => (
                   <button 
@@ -628,7 +608,7 @@ const GoalEditorModal = ({ activePlan, context, onClose, onSave }: any) => {
             </div>
 
             <div className="space-y-4">
-              <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Escolha a Cor de Identificação</label>
+              <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Cor</label>
               <div className="flex flex-wrap gap-3">
                 {GOAL_COLORS.map(color => (
                   <button 
@@ -643,41 +623,39 @@ const GoalEditorModal = ({ activePlan, context, onClose, onSave }: any) => {
           </div>
 
           <div className="space-y-4">
-            <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Métricas de Planejamento</label>
+            <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Métricas</label>
             <div className="bg-zinc-950 border border-zinc-800 rounded-[2.5rem] p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
               {(goal.type === GoalType.CLASS || goal.type === GoalType.SUMMARY) && (
                 <div className="space-y-2">
-                  <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Duração Total (Minutos)</span>
+                  <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Minutos</span>
                   <input 
                     type="number"
                     value={goal.minutes || ''}
                     onChange={(e) => setGoal({ ...goal, minutes: Number(e.target.value) })}
                     className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-4 text-white font-bold outline-none focus:border-red-500 transition-all"
-                    placeholder="Ex: 120"
                   />
                 </div>
               )}
               {(goal.type === GoalType.MATERIAL || goal.type === GoalType.QUESTIONS || goal.type === GoalType.LEI_SECA) && (
                 <div className="space-y-2">
-                  <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Volume de Páginas</span>
+                  <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Páginas</span>
                   <input 
                     type="number"
                     value={goal.pages || ''}
                     onChange={(e) => setGoal({ ...goal, pages: Number(e.target.value) })}
                     className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-4 text-white font-bold outline-none focus:border-red-500 transition-all"
-                    placeholder="Ex: 30"
                   />
                 </div>
               )}
               {goal.type === GoalType.LEI_SECA && (
                 <div className="space-y-2">
-                  <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Intensidade (Multiplicador)</span>
+                  <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Fator</span>
                   <select 
                     value={goal.multiplier || 1}
                     onChange={(e) => setGoal({ ...goal, multiplier: Number(e.target.value) })}
                     className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-4 text-white font-black uppercase outline-none focus:border-red-500 appearance-none transition-all"
                   >
-                    {[1, 2, 3, 4, 5].map(v => <option key={v} value={v}>{v}x Repetições</option>)}
+                    {[1, 2, 3, 4, 5].map(v => <option key={v} value={v}>{v}x</option>)}
                   </select>
                 </div>
               )}
@@ -686,32 +664,24 @@ const GoalEditorModal = ({ activePlan, context, onClose, onSave }: any) => {
 
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Conteúdo Externo (Links)</label>
-              <button 
-                onClick={() => setGoal({ ...goal, links: [...goal.links, ''] })}
-                className="text-[10px] font-black uppercase text-red-500 bg-red-600/10 px-4 py-2 rounded-xl border border-red-600/20 hover:bg-red-600/20 transition-all"
-              >+ Link Adicional</button>
+              <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Links</label>
+              <button onClick={() => setGoal({ ...goal, links: [...goal.links, ''] })} className="text-[10px] font-black uppercase text-red-500 bg-red-600/10 px-4 py-2 rounded-xl">+ Link</button>
             </div>
             <div className="space-y-3">
               {goal.links.map((link, idx) => (
-                <div key={idx} className="flex gap-3 animate-in slide-in-from-right-2">
-                  <div className="relative flex-1">
-                    <LinkIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-700" size={16} />
-                    <input 
-                      value={link}
-                      onChange={(e) => {
-                        const newLinks = [...goal.links];
-                        newLinks[idx] = e.target.value;
-                        setGoal({ ...goal, links: newLinks });
-                      }}
-                      placeholder="https://sua-plataforma.com/aula-123"
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl pl-12 pr-6 py-4 text-xs text-zinc-300 outline-none focus:border-red-500 transition-all"
-                    />
-                  </div>
-                  <button onClick={() => setGoal({ ...goal, links: goal.links.filter((_, i) => i !== idx) })} className="p-4 bg-zinc-950 hover:bg-red-900/20 border border-zinc-800 rounded-2xl text-zinc-700 hover:text-red-500 transition-all"><Trash2 size={18} /></button>
+                <div key={idx} className="flex gap-3">
+                  <input 
+                    value={link}
+                    onChange={(e) => {
+                      const newLinks = [...goal.links];
+                      newLinks[idx] = e.target.value;
+                      setGoal({ ...goal, links: newLinks });
+                    }}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-6 py-4 text-xs text-zinc-300 outline-none focus:border-red-500 transition-all"
+                  />
+                  <button onClick={() => setGoal({ ...goal, links: goal.links.filter((_, i) => i !== idx) })} className="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl text-zinc-700 hover:text-red-500 transition-all"><Trash2 size={18} /></button>
                 </div>
               ))}
-              {goal.links.length === 0 && <p className="text-center py-6 border-2 border-dashed border-zinc-900 rounded-3xl text-zinc-800 font-bold text-[10px] uppercase">Nenhum link configurado.</p>}
             </div>
           </div>
 
@@ -719,51 +689,27 @@ const GoalEditorModal = ({ activePlan, context, onClose, onSave }: any) => {
             <div className="bg-red-950/10 border border-red-600/20 rounded-[2.5rem] p-10 space-y-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-red-600 rounded-2xl shadow-lg shadow-red-600/20">
-                    <RefreshCw size={24} className="text-white" />
-                  </div>
-                  <div>
-                    <span className="font-black text-xl text-white uppercase tracking-tighter block">Revisão Espaçada</span>
-                    <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest">Automatize o retorno deste conteúdo</span>
-                  </div>
+                  <RefreshCw size={24} className="text-red-600" />
+                  <span className="font-black text-xl text-white uppercase tracking-tighter block">Revisão Espaçada</span>
                 </div>
-                <div className="relative inline-block w-14 h-8">
-                  <input 
-                    type="checkbox"
-                    checked={goal.reviewConfig?.enabled || false}
-                    onChange={(e) => setGoal({ ...goal, reviewConfig: { ...goal.reviewConfig!, enabled: e.target.checked } })}
-                    className="sr-only peer"
-                    id="review-toggle"
-                  />
-                  <label htmlFor="review-toggle" className="absolute cursor-pointer inset-0 bg-zinc-800 rounded-full transition-colors peer-checked:bg-red-600"></label>
-                  <div className="absolute top-1 left-1 bg-white w-6 h-6 rounded-full transition-transform peer-checked:translate-x-6"></div>
-                </div>
+                <input 
+                  type="checkbox"
+                  checked={goal.reviewConfig?.enabled || false}
+                  onChange={(e) => setGoal({ ...goal, reviewConfig: { ...goal.reviewConfig!, enabled: e.target.checked } })}
+                  className="w-6 h-6 rounded border-zinc-800 bg-zinc-900 checked:bg-red-600 transition-all"
+                />
               </div>
               
               {goal.reviewConfig?.enabled && (
-                <div className="space-y-6 pt-6 border-t border-red-900/30 animate-in fade-in duration-500">
+                <div className="space-y-6 pt-6 border-t border-red-900/30">
                   <div className="space-y-3">
-                    <span className="text-[10px] text-zinc-400 uppercase font-black tracking-widest block ml-1">Sequência de Dias (Intervalos)</span>
+                    <span className="text-[10px] text-zinc-400 uppercase font-black tracking-widest block ml-1">Intervalos (dias)</span>
                     <input 
                       value={goal.reviewConfig.intervals.join(', ')}
                       onChange={(e) => setGoal({ ...goal, reviewConfig: { ...goal.reviewConfig!, intervals: e.target.value.split(',').map(v => parseInt(v.trim())).filter(v => !isNaN(v)) } })}
                       className="w-full bg-zinc-950 border border-red-900/20 rounded-2xl px-6 py-4 text-sm text-red-100 font-bold focus:border-red-500 outline-none"
-                      placeholder="Ex: 1, 7, 15, 30"
                     />
-                    <p className="text-[9px] text-zinc-600 italic">Cada número representa os dias após a última conclusão da meta.</p>
                   </div>
-                  <label className="flex items-center gap-4 group cursor-pointer">
-                    <div className="relative w-5 h-5 bg-zinc-950 border border-zinc-800 rounded flex items-center justify-center transition-all group-hover:border-red-500">
-                      {goal.reviewConfig.repeatLast && <CheckCircle2 size={16} className="text-red-500" />}
-                      <input 
-                        type="checkbox"
-                        checked={goal.reviewConfig.repeatLast}
-                        onChange={(e) => setGoal({ ...goal, reviewConfig: { ...goal.reviewConfig!, repeatLast: e.target.checked } })}
-                        className="sr-only"
-                      />
-                    </div>
-                    <span className="text-xs text-zinc-400 font-bold">Repetir o último ciclo de revisão infinitamente</span>
-                  </label>
                 </div>
               )}
             </div>
@@ -771,8 +717,8 @@ const GoalEditorModal = ({ activePlan, context, onClose, onSave }: any) => {
         </div>
 
         <div className="p-10 border-t border-zinc-800 flex gap-6 bg-zinc-950/50 shrink-0">
-          <button onClick={onClose} className="flex-1 py-5 rounded-2xl border border-zinc-800 text-zinc-500 font-black uppercase text-xs tracking-widest hover:bg-zinc-900 transition-all">Cancelar</button>
-          <button onClick={() => onSave(context.dId, context.tId, goal)} className="flex-1 py-5 rounded-2xl bg-red-600 text-white font-black uppercase text-xs tracking-widest shadow-xl shadow-red-600/30 hover:bg-red-500 transition-all">Sincronizar Meta</button>
+          <button onClick={onClose} className="flex-1 py-5 rounded-2xl border border-zinc-800 text-zinc-500 font-black uppercase text-xs tracking-widest">Cancelar</button>
+          <button onClick={() => onSave(context.dId, context.tId, goal)} className="flex-1 py-5 rounded-2xl bg-red-600 text-white font-black uppercase text-xs tracking-widest shadow-xl shadow-red-600/30">Sincronizar</button>
         </div>
       </div>
     </div>

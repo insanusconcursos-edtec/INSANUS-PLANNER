@@ -1,10 +1,9 @@
 
 import React, { useState } from 'react';
-import { ShieldCheck, User, Lock, ArrowRight, Zap } from 'lucide-react';
-import { RegisteredUser } from '../types';
+import { ShieldCheck, User, Lock, ArrowRight, Zap, AlertCircle } from 'lucide-react';
 
 interface LoginViewProps {
-  onLogin: (email: string, pass: string) => void;
+  onLogin: (email: string, pass: string) => Promise<void>;
   logoUrl: string;
 }
 
@@ -12,14 +11,21 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, logoUrl }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      onLogin(email, password);
+    setError(null);
+    
+    try {
+      await onLogin(email, password);
+    } catch (err: any) {
+      console.error("Login Error:", err);
+      setError("E-mail ou senha incorretos. Verifique seus dados e tente novamente.");
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   };
 
   return (
@@ -47,9 +53,12 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, logoUrl }) => {
                 <input 
                   type="email" 
                   value={email}
-                  onChange={e => setEmail(e.target.value)}
+                  onChange={e => {
+                    setEmail(e.target.value);
+                    if (error) setError(null);
+                  }}
                   placeholder="admin@exemplo.com"
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl pl-12 pr-4 py-4 text-white focus:border-red-600 outline-none transition-all placeholder:text-zinc-800"
+                  className={`w-full bg-zinc-950 border ${error ? 'border-red-600/50' : 'border-zinc-800'} rounded-2xl pl-12 pr-4 py-4 text-white focus:border-red-600 outline-none transition-all placeholder:text-zinc-800`}
                   required
                 />
               </div>
@@ -62,14 +71,26 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, logoUrl }) => {
                 <input 
                   type="password" 
                   value={password}
-                  onChange={e => setPassword(e.target.value)}
+                  onChange={e => {
+                    setPassword(e.target.value);
+                    if (error) setError(null);
+                  }}
                   placeholder="••••••••••••"
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl pl-12 pr-4 py-4 text-white focus:border-red-600 outline-none transition-all placeholder:text-zinc-800"
+                  className={`w-full bg-zinc-950 border ${error ? 'border-red-600/50' : 'border-zinc-800'} rounded-2xl pl-12 pr-4 py-4 text-white focus:border-red-600 outline-none transition-all placeholder:text-zinc-800`}
                   required
                 />
               </div>
             </div>
           </div>
+
+          {error && (
+            <div className="flex items-start gap-3 bg-red-600/10 border border-red-600/50 p-4 rounded-2xl animate-in fade-in slide-in-from-top-2 duration-300">
+              <AlertCircle className="text-red-500 shrink-0 mt-0.5" size={18} />
+              <p className="text-[11px] font-bold text-red-200 uppercase tracking-tight leading-tight">
+                {error}
+              </p>
+            </div>
+          )}
 
           <button 
             type="submit" 

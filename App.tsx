@@ -9,7 +9,7 @@ import LoginView from './components/LoginView.tsx';
 import { AppState, StudyPlan, UserRoutine, PlanningEntry, RegisteredUser, Goal } from './types.ts';
 import { INITIAL_LOGO } from './constants.tsx';
 import { generatePlanning } from './services/scheduler.ts';
-import { Eye, ShieldAlert, Loader2 } from 'lucide-react';
+import { Eye, ShieldAlert, Loader2, ExternalLink, LogOut } from 'lucide-react';
 
 // Firebase Imports
 import { auth, db } from './firebase.ts';
@@ -120,14 +120,8 @@ const App: React.FC = () => {
   }, [state.auth.isAuthenticated, state.auth.currentUser?.id]);
 
   const handleLogin = async (email: string, pass: string) => {
-    try {
-      setLoading(true);
-      await signInWithEmailAndPassword(auth, email, pass);
-    } catch (error) {
-      alert("Erro ao entrar: E-mail ou senha incorretos.");
-    } finally {
-      setLoading(false);
-    }
+    // A função apenas executa o login e permite que o componente chamador capture erros
+    await signInWithEmailAndPassword(auth, email, pass);
   };
 
   const logout = async () => {
@@ -210,6 +204,10 @@ const App: React.FC = () => {
     await setDoc(doc(db, "user_progress", state.auth.currentUser.id), { planning: updatedPlanning }, { merge: true });
   };
 
+  const handleOpenInNewTab = () => {
+    window.open(window.location.href, '_blank');
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center gap-4">
@@ -229,23 +227,42 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-zinc-950 text-zinc-100 overflow-x-hidden">
-      {state.auth.currentUser?.role === 'ADMIN' && (
-        <div className="fixed top-0 left-0 right-0 h-12 bg-red-600 z-[100] flex items-center justify-between px-6 shadow-xl md:ml-64">
-           <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-white">
-             <ShieldAlert size={16} /> ADMINISTRADOR CONECTADO
-           </div>
+      {/* Barra Superior Global */}
+      <div className={`fixed top-0 left-0 right-0 h-12 z-[100] flex items-center justify-between px-6 shadow-xl transition-all md:ml-64 ${state.auth.currentUser?.role === 'ADMIN' ? 'bg-red-600' : 'bg-zinc-900 border-b border-zinc-800'}`}>
+         <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-white">
+           {state.auth.currentUser?.role === 'ADMIN' ? (
+             <><ShieldAlert size={16} /> ADMINISTRADOR CONECTADO</>
+           ) : (
+             <><ShieldAlert size={16} className="text-red-500" /> AMBIENTE DO ALUNO</>
+           )}
+         </div>
+         <div className="flex items-center gap-2 md:gap-3">
+           {state.auth.currentUser?.role === 'ADMIN' && (
+             <button 
+              onClick={() => {
+                setIsPreviewMode(!isPreviewMode);
+                if (!isPreviewMode) setCurrentView('daily');
+                else setCurrentView('admin');
+              }}
+              className="bg-black/20 hover:bg-black/40 text-white px-3 py-1.5 rounded-lg text-[9px] font-black border border-white/20 transition-all flex items-center gap-2"
+             >
+               <Eye size={12} /> {isPreviewMode ? 'VOLTAR PARA ADMIN' : 'SIMULAR USUÁRIO'}
+             </button>
+           )}
            <button 
-            onClick={() => {
-              setIsPreviewMode(!isPreviewMode);
-              if (!isPreviewMode) setCurrentView('daily');
-              else setCurrentView('admin');
-            }}
-            className="bg-black/20 hover:bg-black/40 text-white px-4 py-1.5 rounded-lg text-[10px] font-black border border-white/20 transition-all flex items-center gap-2"
+             onClick={handleOpenInNewTab}
+             className="bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1.5 rounded-lg text-[9px] font-black border border-zinc-700 transition-all flex items-center gap-2 shadow-lg"
            >
-             <Eye size={14} /> {isPreviewMode ? 'VOLTAR PARA ADMIN' : 'SIMULAR VISÃO USUÁRIO'}
+             <ExternalLink size={12} className="text-red-500" /> ABRIR EM OUTRA GUIA
            </button>
-        </div>
-      )}
+           <button 
+             onClick={logout}
+             className="bg-zinc-800 hover:bg-red-600/20 hover:text-red-500 text-white px-3 py-1.5 rounded-lg text-[9px] font-black border border-zinc-700 transition-all flex items-center gap-2 shadow-lg"
+           >
+             <LogOut size={12} /> SAIR
+           </button>
+         </div>
+      </div>
 
       <Sidebar 
         currentView={currentView} 
@@ -256,7 +273,7 @@ const App: React.FC = () => {
         isPreview={isPreviewMode}
       />
       
-      <main className={`flex-1 min-h-screen bg-[radial-gradient(circle_at_50%_50%,rgba(24,24,27,1)_0%,rgba(9,9,11,1)_100%)] transition-all md:ml-64 ${state.auth.currentUser?.role === 'ADMIN' ? 'pt-12' : ''}`}>
+      <main className={`flex-1 min-h-screen bg-[radial-gradient(circle_at_50%_50%,rgba(24,24,27,1)_0%,rgba(9,9,11,1)_100%)] transition-all md:ml-64 pt-12`}>
         {currentView === 'admin' && state.auth.currentUser?.role === 'ADMIN' && !isPreviewMode ? (
           <AdminView 
             plans={state.admin.plans} 
