@@ -46,7 +46,9 @@ const AdminView: React.FC<AdminViewProps> = ({ plans, updatePlans, users, update
   );
 
   const savePlan = async (plan: StudyPlan) => {
-    await setDoc(doc(db, "plans", plan.id), plan);
+    // Sanitização para garantir que não existam instâncias complexas
+    const sanitizedPlan = JSON.parse(JSON.stringify(plan));
+    await setDoc(doc(db, "plans", plan.id), sanitizedPlan);
   };
 
   const createPlan = async () => {
@@ -657,7 +659,8 @@ const GoalEditorModal = ({ activePlan, context, onClose, onSave }: any) => {
     color: GOAL_COLORS[0],
     order: 0,
     links: [],
-    reviewConfig: { enabled: false, intervals: [1, 7, 15, 30], repeatLast: false }
+    reviewConfig: { enabled: false, intervals: [1, 7, 15, 30], repeatLast: false },
+    observations: ''
   });
 
   return (
@@ -740,6 +743,16 @@ const GoalEditorModal = ({ activePlan, context, onClose, onSave }: any) => {
                 </div>
               )}
             </div>
+          </div>
+
+          <div className="space-y-4">
+            <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Observações (Facultativo)</label>
+            <textarea 
+              value={goal.observations || ''}
+              onChange={(e) => setGoal({ ...goal, observations: e.target.value })}
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-6 py-4 text-sm text-zinc-300 outline-none focus:border-red-500 transition-all min-h-[100px]"
+              placeholder="Insira dicas ou orientações específicas para esta meta..."
+            />
           </div>
 
           <div className="space-y-4">

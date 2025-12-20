@@ -10,9 +10,43 @@ export enum GoalType {
   SUMMARY = 'RESUMO'
 }
 
+// Fixed missing CycleSystem enum
+export enum CycleSystem {
+  CONTINUOUS = 'CONTINUOUS',
+  ROTATING = 'ROTATING'
+}
+
+// Fixed missing CycleItem interface
+export interface CycleItem {
+  id: string;
+  type: 'DISCIPLINE' | 'FOLDER';
+}
+
+// Fixed missing StudyCycle interface
+export interface StudyCycle {
+  id: string;
+  name: string;
+  order: number;
+  items: CycleItem[];
+  topicsPerDiscipline: number;
+}
+
+// Fixed missing Folder interface
+export interface Folder {
+  id: string;
+  name: string;
+}
+
+// Fixed missing PlanAccess interface
+export interface PlanAccess {
+  planId: string;
+  assignedAt: string;
+  expiresAt: string;
+}
+
 export interface ReviewConfig {
   enabled: boolean;
-  intervals: number[]; // e.g. [1, 7, 15, 30]
+  intervals: number[];
   repeatLast: boolean;
 }
 
@@ -22,13 +56,14 @@ export interface Goal {
   title: string;
   color: string;
   order: number;
-  minutes?: number; // Para Aulas e Resumo
-  pages?: number;   // Para Material, Questões e Lei Seca
+  minutes?: number;
+  pages?: number;
   links: string[];
-  articles?: string; // Para Lei Seca
-  multiplier?: number; // Para Lei Seca (2x, 3x, etc)
+  articles?: string;
+  multiplier?: number;
   reviewConfig?: ReviewConfig;
-  referencedGoalIds?: string[]; // Para Resumo (quais metas ele resume)
+  referencedGoalIds?: string[];
+  observations?: string;
 }
 
 export interface Topic {
@@ -45,30 +80,7 @@ export interface Discipline {
   folderId: string | null;
 }
 
-export interface Folder {
-  id: string;
-  name: string;
-  order: number;
-}
-
-export enum CycleSystem {
-  CONTINUOUS = 'CONTÍNUO',
-  ROTATING = 'ROTATIVO'
-}
-
-export interface CycleItem {
-  id: string;
-  type: 'DISCIPLINE' | 'FOLDER';
-}
-
-export interface StudyCycle {
-  id: string;
-  name: string;
-  items: CycleItem[];
-  topicsPerDiscipline: number;
-  order: number;
-}
-
+// Updated StudyPlan to use concrete types instead of any
 export interface StudyPlan {
   id: string;
   name: string;
@@ -79,26 +91,22 @@ export interface StudyPlan {
   cycleSystem: CycleSystem;
 }
 
-export interface PlanAccess {
-  planId: string;
-  expiresAt: string; // ISO Date
-  assignedAt: string; // ISO Date
-}
-
+// Updated RegisteredUser to include accessList with PlanAccess type and optional password field
 export interface RegisteredUser {
   id: string;
   name: string;
   cpf: string;
   email: string;
-  password: string;
   role: UserRole;
   accessList: PlanAccess[];
+  password?: string;
 }
 
 export interface UserRoutine {
-  days: { [key: number]: number }; // dayIndex: minutes
+  days: { [key: number]: number };
   profile: UserProfile;
   selectedPlanId: string | null;
+  isPaused: boolean;
 }
 
 export interface PlanningEntry {
@@ -110,8 +118,8 @@ export interface PlanningEntry {
   durationMinutes: number;
   status: 'PENDING' | 'COMPLETED' | 'DELAYED';
   isReview: boolean;
-  reviewStep?: number; // 0 for 1st review, 1 for 2nd...
-  actualTimeSpent?: number;
+  reviewStep?: number;
+  actualTimeSpent?: number; // Tempo líquido em minutos
 }
 
 export interface AppState {
@@ -126,7 +134,7 @@ export interface AppState {
   };
   user: {
     routine: UserRoutine;
-    planning: PlanningEntry[];
+    allPlannings: { [planId: string]: PlanningEntry[] };
     currentSession: {
       activeGoalId: string | null;
       startTime: number | null;

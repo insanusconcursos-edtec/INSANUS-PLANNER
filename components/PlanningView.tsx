@@ -1,14 +1,15 @@
 
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, LayoutGrid, List } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, LayoutGrid, List, ShieldAlert } from 'lucide-react';
 import { PlanningEntry, StudyPlan } from '../types';
 
 interface PlanningViewProps {
   planning: PlanningEntry[];
   plans: StudyPlan[];
+  isPaused?: boolean;
 }
 
-const PlanningView: React.FC<PlanningViewProps> = ({ planning, plans }) => {
+const PlanningView: React.FC<PlanningViewProps> = ({ planning, plans, isPaused = false }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
 
@@ -161,9 +162,16 @@ const PlanningView: React.FC<PlanningViewProps> = ({ planning, plans }) => {
   return (
     <div className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto animate-in fade-in duration-500 pb-20">
       <header className="flex flex-col md:flex-row justify-between items-center gap-6">
-        <div>
-          <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Seu Planejamento</h2>
-          <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Acompanhe seu progresso e metas futuras</p>
+        <div className="flex items-center gap-4">
+          <div>
+            <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Seu Planejamento</h2>
+            <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Acompanhe seu progresso e metas futuras</p>
+          </div>
+          {isPaused && (
+            <div className="bg-red-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 animate-pulse shadow-lg shadow-red-600/30">
+              <ShieldAlert size={14} /> Pausado
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-4 flex-wrap justify-center">
