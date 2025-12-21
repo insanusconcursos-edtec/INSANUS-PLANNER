@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ShieldCheck, User, Lock, ArrowRight, Zap, AlertCircle } from 'lucide-react';
+import { ShieldCheck, User, Lock, ArrowRight, Zap, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 interface LoginViewProps {
   onLogin: (email: string, pass: string) => Promise<void>;
@@ -10,6 +10,7 @@ interface LoginViewProps {
 const LoginView: React.FC<LoginViewProps> = ({ onLogin, logoUrl }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,7 +31,6 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, logoUrl }) => {
 
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      {/* Background Decor */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-red-600/10 blur-[120px] rounded-full pointer-events-none" />
       
       <div className="w-full max-w-md space-y-8 relative z-10">
@@ -69,16 +69,23 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin, logoUrl }) => {
               <div className="relative group">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-700 group-focus-within:text-red-500 transition-colors" size={18} />
                 <input 
-                  type="password" 
+                  type={showPassword ? "text" : "password"} 
                   value={password}
                   onChange={e => {
                     setPassword(e.target.value);
                     if (error) setError(null);
                   }}
                   placeholder="••••••••••••"
-                  className={`w-full bg-zinc-950 border ${error ? 'border-red-600/50' : 'border-zinc-800'} rounded-2xl pl-12 pr-4 py-4 text-white focus:border-red-600 outline-none transition-all placeholder:text-zinc-800`}
+                  className={`w-full bg-zinc-950 border ${error ? 'border-red-600/50' : 'border-zinc-800'} rounded-2xl pl-12 pr-12 py-4 text-white focus:border-red-600 outline-none transition-all placeholder:text-zinc-800`}
                   required
                 />
+                <button 
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-white transition-colors"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
             </div>
           </div>

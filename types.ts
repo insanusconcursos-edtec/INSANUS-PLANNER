@@ -10,19 +10,16 @@ export enum GoalType {
   SUMMARY = 'RESUMO'
 }
 
-// Fixed missing CycleSystem enum
 export enum CycleSystem {
   CONTINUOUS = 'CONTINUOUS',
   ROTATING = 'ROTATING'
 }
 
-// Fixed missing CycleItem interface
 export interface CycleItem {
   id: string;
   type: 'DISCIPLINE' | 'FOLDER';
 }
 
-// Fixed missing StudyCycle interface
 export interface StudyCycle {
   id: string;
   name: string;
@@ -31,13 +28,12 @@ export interface StudyCycle {
   topicsPerDiscipline: number;
 }
 
-// Fixed missing Folder interface
 export interface Folder {
   id: string;
   name: string;
+  order: number; // Added for sorting
 }
 
-// Fixed missing PlanAccess interface
 export interface PlanAccess {
   planId: string;
   assignedAt: string;
@@ -78,9 +74,9 @@ export interface Discipline {
   name: string;
   topics: Topic[];
   folderId: string | null;
+  order: number; // Added for sorting
 }
 
-// Updated StudyPlan to use concrete types instead of any
 export interface StudyPlan {
   id: string;
   name: string;
@@ -91,7 +87,6 @@ export interface StudyPlan {
   cycleSystem: CycleSystem;
 }
 
-// Updated RegisteredUser to include accessList with PlanAccess type and optional password field
 export interface RegisteredUser {
   id: string;
   name: string;
@@ -119,7 +114,7 @@ export interface PlanningEntry {
   status: 'PENDING' | 'COMPLETED' | 'DELAYED';
   isReview: boolean;
   reviewStep?: number;
-  actualTimeSpent?: number; // Tempo líquido em minutos
+  actualTimeSpent?: number;
 }
 
 export interface AppState {
