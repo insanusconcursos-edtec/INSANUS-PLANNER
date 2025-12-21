@@ -8,7 +8,7 @@ import DailyGoalsView from './components/DailyGoalsView.tsx';
 import LoginView from './components/LoginView.tsx';
 import { AppState, StudyPlan, UserRoutine, PlanningEntry, RegisteredUser, Goal } from './types.ts';
 import { INITIAL_LOGO } from './constants.tsx';
-import { generatePlanning } from './services/scheduler.ts';
+import { generatePlanning, getLocalDateString } from './services/scheduler.ts';
 import { Eye, ShieldAlert, Loader2, ExternalLink, LogOut } from 'lucide-react';
 
 import { auth, db } from './firebase.ts';
@@ -124,7 +124,6 @@ const App: React.FC = () => {
     const entry = currentPlanning[entryIdx];
     currentPlanning[entryIdx] = { ...entry, status: 'COMPLETED', actualTimeSpent: timeSpent };
 
-    // --- LÓGICA DE REVISÃO ESPAÇADA ---
     const activePlan = state.admin.plans.find(p => p.id === planId);
     const disc = activePlan?.disciplines.find(d => d.id === entry.disciplineId);
     const topic = disc?.topics.find(t => t.id === entry.topicId);
@@ -133,31 +132,24 @@ const App: React.FC = () => {
     if (goal?.reviewConfig?.enabled) {
       const currentStep = entry.reviewStep || 0;
       const intervals = goal.reviewConfig.intervals;
-      
       let nextInterval = intervals[currentStep];
       let nextStep = currentStep + 1;
 
-      // Se repetir o último indicador
-      if (currentStep >= intervals.length) {
-        if (goal.reviewConfig.repeatLast) {
-          nextInterval = intervals[intervals.length - 1];
-          nextStep = currentStep + 1;
-        } else {
-          nextInterval = null;
-        }
+      if (currentStep >= intervals.length && goal.reviewConfig.repeatLast) {
+        nextInterval = intervals[intervals.length - 1];
+        nextStep = currentStep + 1;
       }
 
-      if (nextInterval !== null) {
+      if (nextInterval !== null && nextInterval !== undefined) {
         const nextDate = new Date();
         nextDate.setDate(nextDate.getDate() + nextInterval);
-        
         currentPlanning.push({
           id: Math.random().toString(36).substr(2, 9),
           goalId: entry.goalId,
           topicId: entry.topicId,
           disciplineId: entry.disciplineId,
           date: nextDate.toISOString(),
-          durationMinutes: entry.durationMinutes, // Tempo da meta original para revisão
+          durationMinutes: entry.durationMinutes,
           status: 'PENDING',
           isReview: true,
           reviewStep: nextStep
@@ -175,14 +167,26 @@ const App: React.FC = () => {
     if (!selectedPlan || !state.auth.currentUser || !selectedPlanId) return;
 
     const currentPlanning = state.user.allPlannings[selectedPlanId] || [];
-    const newPlanning = generatePlanning(selectedPlan, state.user.routine, new Date(), currentPlanning);
+    const newPlanning = generatePlanning(selectedPlan, state.user.routine, new Date(), currentPlanning, 'new');
     
     const newAllPlannings = { ...state.user.allPlannings, [selectedPlanId]: sanitize(newPlanning) };
     await setDoc(doc(db, "user_progress", state.auth.currentUser.id), { allPlannings: newAllPlannings }, { merge: true });
     setCurrentView('planning');
   };
 
-  // Fix: Implemented handleTogglePause to toggle the paused state of the student's study plan
+  const handleReplanPlan = async () => {
+    const selectedPlanId = state.user.routine.selectedPlanId;
+    const selectedPlan = state.admin.plans.find(p => p.id === selectedPlanId);
+    if (!selectedPlan || !state.auth.currentUser || !selectedPlanId) return;
+
+    const currentPlanning = state.user.allPlannings[selectedPlanId] || [];
+    const newPlanning = generatePlanning(selectedPlan, state.user.routine, new Date(), currentPlanning, 'replan');
+    
+    const newAllPlannings = { ...state.user.allPlannings, [selectedPlanId]: sanitize(newPlanning) };
+    await setDoc(doc(db, "user_progress", state.auth.currentUser.id), { allPlannings: newAllPlannings }, { merge: true });
+    alert("Replanejamento concluído! Suas metas pendentes foram reorganizadas a partir de hoje.");
+  };
+
   const handleTogglePause = async () => {
     if (!state.auth.currentUser) return;
     const newPaused = !state.user.routine.isPaused;
@@ -191,16 +195,13 @@ const App: React.FC = () => {
     }, { merge: true });
   };
 
-  // Fix: Implemented handleRestartPlan to clear all planning entries for the current selected plan
   const handleRestartPlan = async () => {
     if (!state.auth.currentUser || !state.user.routine.selectedPlanId) return;
     const planId = state.user.routine.selectedPlanId;
     const newAllPlannings = { ...state.user.allPlannings, [planId]: [] };
     await setDoc(doc(db, "user_progress", state.auth.currentUser.id), { allPlannings: newAllPlannings }, { merge: true });
-    alert("Plano reiniciado. Gere um novo planejamento para continuar.");
   };
 
-  // Restante das funções auxiliares...
   const handleUpdatePlans = (plans: StudyPlan[]) => setState(prev => ({ ...prev, admin: { ...prev.admin, plans } }));
   const handleUpdateUsers = (users: RegisteredUser[]) => setState(prev => ({ ...prev, admin: { ...prev.admin, users } }));
   const handleUpdateLogo = async (url: string) => { await setDoc(doc(db, "config", "global"), { logoUrl: url }); };
@@ -208,10 +209,6 @@ const App: React.FC = () => {
   if (loading) return (
     <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-6">
       <Loader2 className="text-red-600 animate-spin" size={64} />
-      <div className="text-center">
-        <p className="text-white font-black uppercase tracking-[0.3em] text-xs">Carregando Ecossistema</p>
-        <p className="text-zinc-700 text-[10px] font-bold mt-2 uppercase">Sincronizando com a Matrix</p>
-      </div>
     </div>
   );
 
@@ -224,15 +221,14 @@ const App: React.FC = () => {
     <div className="flex flex-col md:flex-row min-h-screen bg-zinc-950 text-zinc-100 overflow-x-hidden">
       <div className={`fixed top-0 left-0 right-0 h-12 z-[100] flex items-center justify-between px-6 shadow-2xl backdrop-blur-md md:ml-64 ${state.auth.currentUser?.role === 'ADMIN' ? 'bg-red-600' : 'bg-zinc-900/80 border-b border-zinc-800'}`}>
          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-white">
-           <ShieldAlert size={14} /> {state.auth.currentUser?.role === 'ADMIN' ? 'MODO ADMINISTRADOR' : 'PAINEL DO ESTUDANTE'}
+           <ShieldAlert size={14} /> {state.auth.currentUser?.role === 'ADMIN' ? 'ADMIN' : 'ESTUDANTE'}
          </div>
          <div className="flex items-center gap-3">
            {state.auth.currentUser?.role === 'ADMIN' && (
              <button onClick={() => { setIsPreviewMode(!isPreviewMode); setCurrentView(isPreviewMode ? 'admin' : 'daily'); }} className="bg-black/20 hover:bg-black/40 text-white px-3 py-1.5 rounded-lg text-[9px] font-black border border-white/20 transition-all flex items-center gap-2">
-               <Eye size={12} /> {isPreviewMode ? 'ADMIN' : 'SIMULAR'}
+               <Eye size={12} /> {isPreviewMode ? 'VOLTAR AO ADMIN' : 'MODO SIMULAÇÃO'}
              </button>
            )}
-           <button onClick={() => window.open(window.location.href, '_blank')} className="bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1.5 rounded-lg text-[9px] font-black border border-zinc-700 transition-all"><ExternalLink size={12} /></button>
            <button onClick={() => signOut(auth)} className="bg-zinc-800 hover:bg-red-600/20 hover:text-red-500 text-white px-3 py-1.5 rounded-lg text-[9px] font-black border border-zinc-700 transition-all"><LogOut size={12} /></button>
          </div>
       </div>
@@ -245,8 +241,8 @@ const App: React.FC = () => {
         ) : (
           <>
             {currentView === 'routine' && <RoutineView plans={availablePlans} routine={state.user.routine} updateRoutine={handleUpdateRoutine} onGeneratePlanning={handleGeneratePlanning} onTogglePause={handleTogglePause} onRestartPlan={handleRestartPlan} />}
-            {currentView === 'planning' && <PlanningView planning={activePlanning} plans={state.admin.plans} isPaused={state.user.routine.isPaused} />}
-            {currentView === 'daily' && <DailyGoalsView planning={activePlanning} plans={state.admin.plans} onComplete={handleCompleteGoal} isPaused={state.user.routine.isPaused} globalStudyTime={statistics.globalMinutes} planStudyTime={statistics.planMinutes[state.user.routine.selectedPlanId || ''] || 0} />}
+            {currentView === 'planning' && <PlanningView planning={activePlanning} plans={state.admin.plans} isPaused={state.user.routine.isPaused} onReplan={handleReplanPlan} />}
+            {currentView === 'daily' && <DailyGoalsView planning={activePlanning} plans={state.admin.plans} onComplete={handleCompleteGoal} onReplan={handleReplanPlan} isPaused={state.user.routine.isPaused} globalStudyTime={statistics.globalMinutes} planStudyTime={statistics.planMinutes[state.user.routine.selectedPlanId || ''] || 0} currentUser={state.auth.currentUser} />}
           </>
         )}
       </main>

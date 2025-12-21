@@ -11,6 +11,14 @@ import {
 } from '../types';
 import { PROFILE_SPEEDS } from '../constants';
 
+// Helper para obter data local YYYY-MM-DD
+export const getLocalDateString = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const calculateGoalDuration = (goal: Goal, profile: UserProfile): number => {
   if (goal.type === GoalType.CLASS || goal.type === GoalType.SUMMARY) {
     return goal.minutes || 0;
@@ -26,9 +34,6 @@ const calculateGoalDuration = (goal: Goal, profile: UserProfile): number => {
   return total;
 };
 
-/**
- * Transforma itens de ciclo (Disciplinas ou Pastas) em uma lista flat de IDs de Disciplinas.
- */
 const getOrderedDisciplineIdsFromCycle = (plan: StudyPlan, items: CycleItem[]): string[] => {
   const ids: string[] = [];
   items.forEach(item => {
@@ -45,19 +50,31 @@ const getOrderedDisciplineIdsFromCycle = (plan: StudyPlan, items: CycleItem[]): 
   return [...new Set(ids)];
 };
 
+/**
+ * Gera ou Replaneja o cronograma.
+ * Se mode === 'replan', ele ignora datas passadas para itens não concluídos e joga tudo pra frente.
+ */
 export const generatePlanning = (
   plan: StudyPlan,
   routine: UserRoutine,
   startDate: Date = new Date(),
-  existingPlanning: PlanningEntry[] = []
+  existingPlanning: PlanningEntry[] = [],
+  mode: 'new' | 'replan' = 'new'
 ): PlanningEntry[] => {
   if (!plan || !plan.cycles.length) return [];
 
+  const todayStr = getLocalDateString(new Date());
+
+  // 1. Identificar Metas Concluídas e Metas de Revisão já agendadas para o futuro
+  // Se for REPLAN, mantemos apenas COMPLETED e descartamos PENDING do futuro para recriar
+  const completedEntries = existingPlanning.filter(e => e.status === 'COMPLETED');
+  const completedGoalIds = new Set(completedEntries.filter(e => !e.isReview).map(e => e.goalId));
+  
+  // 2. Extrair Ordem de Metas do Plano
   const sortedCycles = [...plan.cycles].sort((a, b) => a.order - b.order);
   const allOrderedGoals: { goal: Goal; topicId: string; disciplineId: string }[] = [];
 
   if (plan.cycleSystem === CycleSystem.CONTINUOUS) {
-    // SISTEMA CONTÍNUO: Ciclo A (Todo) -> Ciclo B (Todo) -> Ciclo C (Todo)
     sortedCycles.forEach(cycle => {
       const disciplineIds = getOrderedDisciplineIdsFromCycle(plan, cycle.items);
       disciplineIds.forEach(dId => {
@@ -72,10 +89,8 @@ export const generatePlanning = (
       });
     });
   } else {
-    // SISTEMA ROTATIVO: Round 1 de Todos os Ciclos -> Round 2 de Todos os Ciclos
     let hasMore = true;
     let topicOffsets: Record<string, number> = {};
-
     while (hasMore) {
       hasMore = false;
       sortedCycles.forEach(cycle => {
@@ -103,21 +118,27 @@ export const generatePlanning = (
     }
   }
 
-  // Preservar progresso: Mantém concluídos e revisões já agendadas
-  const historicEntries = existingPlanning.filter(e => e.status === 'COMPLETED' || e.isReview);
-  const completedGoalIds = new Set(historicEntries.filter(e => !e.isReview).map(e => e.goalId));
-  
+  // 3. Filtrar apenas as metas que ainda não foram concluídas
   const pendingGoals = allOrderedGoals.filter(item => !completedGoalIds.has(item.goal.id));
 
+  // 4. Iniciar Distribuição
   let cursorDate = new Date(startDate);
   cursorDate.setHours(0, 0, 0, 0);
   
-  const finalPlanning: PlanningEntry[] = [...historicEntries];
+  const finalPlanning: PlanningEntry[] = [...completedEntries];
+  
+  // Adicionar as revisões que já existem e são futuras ou de hoje
+  const existingReviews = existingPlanning.filter(e => e.isReview && (getLocalDateString(new Date(e.date)) >= todayStr || e.status === 'COMPLETED'));
+  existingReviews.forEach(r => {
+    if (!finalPlanning.find(f => f.id === r.id)) finalPlanning.push(r);
+  });
+
   let pendingIdx = 0;
   let carryOverMinutes = 0;
 
   while (pendingIdx < pendingGoals.length) {
     const dow = cursorDate.getDay();
+    const currentDayStr = getLocalDateString(cursorDate);
     const capacity = routine.days[dow] || 0;
 
     if (capacity <= 0) {
@@ -127,12 +148,9 @@ export const generatePlanning = (
 
     let spentToday = 0;
     
-    // Injeta revisões pendentes do histórico para hoje antes das metas novas
-    const reviewsToday = historicEntries.filter(e => 
-      e.isReview && e.status === 'PENDING' && 
-      e.date.split('T')[0] === cursorDate.toISOString().split('T')[0]
-    );
-    reviewsToday.forEach(r => spentToday += r.durationMinutes);
+    // Contabilizar tempo de metas que JÁ ESTÃO agendadas para este dia (Concluídas ou Revisões)
+    const alreadyScheduled = finalPlanning.filter(e => getLocalDateString(new Date(e.date)) === currentDayStr);
+    alreadyScheduled.forEach(e => spentToday += e.durationMinutes);
 
     while (spentToday < capacity && pendingIdx < pendingGoals.length) {
       const { goal, topicId, disciplineId } = pendingGoals[pendingIdx];
@@ -149,14 +167,14 @@ export const generatePlanning = (
           disciplineId,
           date: cursorDate.toISOString(),
           durationMinutes: Math.round(sessionDuration),
-          status: 'PENDING',
+          status: currentDayStr < todayStr ? 'DELAYED' : 'PENDING',
           isReview: false
         });
         
         spentToday += sessionDuration;
         const diff = remainingForGoal - sessionDuration;
         
-        if (diff < 1) {
+        if (diff < 0.1) {
           pendingIdx++;
           carryOverMinutes = 0;
         } else {
@@ -167,7 +185,7 @@ export const generatePlanning = (
       }
     }
     cursorDate.setDate(cursorDate.getDate() + 1);
-    if (finalPlanning.length > 25000) break; 
+    if (finalPlanning.length > 5000) break; 
   }
 
   return finalPlanning.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());

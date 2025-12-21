@@ -1,20 +1,21 @@
 
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, LayoutGrid, List, ShieldAlert } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, LayoutGrid, List, ShieldAlert, RefreshCw } from 'lucide-react';
 import { PlanningEntry, StudyPlan } from '../types';
+import { getLocalDateString } from '../services/scheduler';
 
 interface PlanningViewProps {
   planning: PlanningEntry[];
   plans: StudyPlan[];
   isPaused?: boolean;
+  onReplan: () => void;
 }
 
-const PlanningView: React.FC<PlanningViewProps> = ({ planning, plans, isPaused = false }) => {
+const PlanningView: React.FC<PlanningViewProps> = ({ planning, plans, isPaused = false, onReplan }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
 
-  const daysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
-  const firstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
+  const todayStr = getLocalDateString(new Date());
 
   const handlePrev = () => {
     if (viewMode === 'month') {
@@ -50,8 +51,8 @@ const PlanningView: React.FC<PlanningViewProps> = ({ planning, plans, isPaused =
   const renderMonthCells = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
-    const totalDays = daysInMonth(year, month);
-    const startDay = firstDayOfMonth(year, month);
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    const startDay = new Date(year, month, 1).getDay();
     const cells = [];
 
     for (let i = 0; i < startDay; i++) {
@@ -60,9 +61,9 @@ const PlanningView: React.FC<PlanningViewProps> = ({ planning, plans, isPaused =
 
     for (let d = 1; d <= totalDays; d++) {
       const dateObj = new Date(year, month, d);
-      const dateStr = dateObj.toISOString().split('T')[0];
-      const dayEntries = planning.filter(e => e.date.split('T')[0] === dateStr);
-      const isToday = new Date().toISOString().split('T')[0] === dateStr;
+      const dateStr = getLocalDateString(dateObj);
+      const dayEntries = planning.filter(e => getLocalDateString(new Date(e.date)) === dateStr);
+      const isToday = todayStr === dateStr;
 
       cells.push(
         <div key={d} className={`h-32 border-r border-b border-zinc-800 p-2 overflow-y-auto transition-colors ${isToday ? 'bg-red-900/10' : 'bg-zinc-950/40 hover:bg-zinc-900/60'}`}>
@@ -80,11 +81,11 @@ const PlanningView: React.FC<PlanningViewProps> = ({ planning, plans, isPaused =
               return (
                 <div 
                   key={entry.id} 
-                  className="text-[8px] px-1.5 py-1 rounded truncate border border-zinc-800/50 shadow-sm font-bold uppercase tracking-tighter"
+                  className={`text-[8px] px-1.5 py-1 rounded truncate border border-zinc-800/50 shadow-sm font-bold uppercase tracking-tighter ${entry.status === 'COMPLETED' ? 'opacity-40 line-through' : ''}`}
                   style={{ backgroundColor: `${goal?.color || '#333'}15`, color: goal?.color || '#fff', borderLeft: `2px solid ${goal?.color || '#333'}` }}
                   title={`${discipline?.name}: ${topic?.title}`}
                 >
-                  {discipline?.name}
+                  {entry.isReview && '[REV] '}{discipline?.name}
                 </div>
               );
             })}
@@ -103,9 +104,9 @@ const PlanningView: React.FC<PlanningViewProps> = ({ planning, plans, isPaused =
     for (let i = 0; i < 7; i++) {
       const dateObj = new Date(start);
       dateObj.setDate(start.getDate() + i);
-      const dateStr = dateObj.toISOString().split('T')[0];
-      const dayEntries = planning.filter(e => e.date.split('T')[0] === dateStr);
-      const isToday = new Date().toISOString().split('T')[0] === dateStr;
+      const dateStr = getLocalDateString(dateObj);
+      const dayEntries = planning.filter(e => getLocalDateString(new Date(e.date)) === dateStr);
+      const isToday = todayStr === dateStr;
 
       cells.push(
         <div key={i} className={`min-h-[400px] border-r border-zinc-800 p-4 transition-all ${isToday ? 'bg-red-900/5' : 'bg-zinc-950/20 hover:bg-zinc-900/40'}`}>
@@ -126,11 +127,13 @@ const PlanningView: React.FC<PlanningViewProps> = ({ planning, plans, isPaused =
               return (
                 <div 
                   key={entry.id} 
-                  className="p-3 rounded-2xl border border-zinc-800/50 shadow-lg group relative overflow-hidden"
+                  className={`p-3 rounded-2xl border border-zinc-800/50 shadow-lg group relative overflow-hidden ${entry.status === 'COMPLETED' ? 'opacity-40' : ''}`}
                   style={{ backgroundColor: `${goal?.color || '#333'}08` }}
                 >
                   <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: goal?.color }} />
-                  <div className="text-[8px] font-black uppercase tracking-widest opacity-50 mb-1" style={{ color: goal?.color }}>{discipline?.name}</div>
+                  <div className="text-[8px] font-black uppercase tracking-widest opacity-50 mb-1" style={{ color: goal?.color }}>
+                    {entry.isReview && 'REVISÃO • '}{discipline?.name}
+                  </div>
                   <div className="text-[10px] font-bold text-zinc-200 leading-tight uppercase tracking-tight line-clamp-2">{topic?.title}</div>
                   <div className="mt-2 text-[8px] font-black text-zinc-600 uppercase">{entry.durationMinutes} MIN</div>
                 </div>
@@ -165,7 +168,7 @@ const PlanningView: React.FC<PlanningViewProps> = ({ planning, plans, isPaused =
         <div className="flex items-center gap-4">
           <div>
             <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Seu Planejamento</h2>
-            <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Acompanhe seu progresso e metas futuras</p>
+            <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Controle total da sua jornada</p>
           </div>
           {isPaused && (
             <div className="bg-red-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 animate-pulse shadow-lg shadow-red-600/30">
@@ -175,7 +178,13 @@ const PlanningView: React.FC<PlanningViewProps> = ({ planning, plans, isPaused =
         </div>
 
         <div className="flex items-center gap-4 flex-wrap justify-center">
-          {/* View Switcher */}
+          <button 
+            onClick={onReplan}
+            className="flex items-center gap-2 px-6 py-2.5 bg-zinc-900 border border-zinc-800 rounded-2xl text-[10px] font-black text-red-500 uppercase tracking-widest hover:bg-zinc-800 transition-all shadow-xl group"
+          >
+            <RefreshCw size={14} className="group-hover:rotate-180 transition-transform duration-500" /> Replanejar Atrasos
+          </button>
+
           <div className="bg-zinc-900 border border-zinc-800 p-1 rounded-2xl flex shadow-xl">
             <button 
               onClick={() => setViewMode('month')}
@@ -191,7 +200,6 @@ const PlanningView: React.FC<PlanningViewProps> = ({ planning, plans, isPaused =
             </button>
           </div>
 
-          {/* Navigation */}
           <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 p-1 rounded-2xl shadow-xl">
             <button onClick={handlePrev} className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-400 hover:text-white transition-all"><ChevronLeft size={20} /></button>
             <div className="min-w-[180px] text-center px-2">
@@ -204,24 +212,13 @@ const PlanningView: React.FC<PlanningViewProps> = ({ planning, plans, isPaused =
 
       <div className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] overflow-hidden shadow-2xl relative">
         <div className="absolute inset-0 bg-gradient-to-b from-red-600/5 to-transparent pointer-events-none" />
-        
         <div className="grid grid-cols-7 bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800 sticky top-0 z-10">
           {dayNames.map(day => (
             <div key={day} className="py-4 text-center text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600 border-r border-zinc-800/50 last:border-r-0">{day}</div>
           ))}
         </div>
-        
         <div className={`grid grid-cols-7 ${viewMode === 'week' ? 'divide-x divide-zinc-800' : ''}`}>
           {viewMode === 'month' ? renderMonthCells() : renderWeekCells()}
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center justify-center gap-8 pt-4">
-        <div className="flex items-center gap-2 text-[9px] font-black text-zinc-500 uppercase tracking-widest">
-          <div className="w-3 h-3 rounded-full bg-red-600 shadow-lg shadow-red-600/20" /> Dia Atual
-        </div>
-        <div className="flex items-center gap-2 text-[9px] font-black text-zinc-500 uppercase tracking-widest">
-          <div className="w-3 h-3 rounded-sm border border-zinc-800 bg-zinc-950/40" /> Dia Sem Metas
         </div>
       </div>
     </div>

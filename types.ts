@@ -31,7 +31,7 @@ export interface StudyCycle {
 export interface Folder {
   id: string;
   name: string;
-  order: number; // Added for sorting
+  order: number;
 }
 
 export interface PlanAccess {
@@ -60,6 +60,8 @@ export interface Goal {
   reviewConfig?: ReviewConfig;
   referencedGoalIds?: string[];
   observations?: string;
+  pdfData?: string; // Base64 content of PDF
+  pdfName?: string;
 }
 
 export interface Topic {
@@ -74,7 +76,7 @@ export interface Discipline {
   name: string;
   topics: Topic[];
   folderId: string | null;
-  order: number; // Added for sorting
+  order: number;
 }
 
 export interface StudyPlan {
