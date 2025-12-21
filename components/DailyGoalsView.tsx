@@ -4,7 +4,7 @@ import {
   Play, Pause, CheckCircle, ExternalLink, Timer, 
   History, Trophy, ArrowRight, Clock, Info, ShieldAlert, RefreshCw, AlertTriangle, FileText, Loader2
 } from 'lucide-react';
-import { PlanningEntry, StudyPlan, RegisteredUser } from '../types';
+import { PlanningEntry, StudyPlan, RegisteredUser, GoalType } from '../types';
 import { getLocalDateString } from '../services/scheduler';
 import { PDFDocument, rgb, degrees } from 'pdf-lib';
 
@@ -61,21 +61,19 @@ const DailyGoalsView: React.FC<DailyGoalsViewProps> = ({
         const { width, height } = page.getSize();
         
         // Sistema de Mosaico (Tiling) para segurança máxima
-        // Adiciona a marca d'água em 9 pontos da página para evitar recortes
         for (let i = 0; i < 3; i++) {
           for (let j = 0; j < 3; j++) {
             page.drawText(watermarkText, {
               x: (width / 3) * i + 30,
               y: (height / 3) * j + 50,
               size: 10,
-              color: rgb(0.8, 0.1, 0.1), // Vermelho Insanus
-              opacity: 0.12, // Suave para não atrapalhar a leitura
+              color: rgb(0.8, 0.1, 0.1), 
+              opacity: 0.12,
               rotate: degrees(35),
             });
           }
         }
 
-        // Rodapé de segurança fixo
         page.drawText(`Documento rastreado: ${currentUser.email} | IP registrado no servidor`, {
           x: 20,
           y: 20,
@@ -89,13 +87,11 @@ const DailyGoalsView: React.FC<DailyGoalsViewProps> = ({
       const blob = new Blob([pdfBytes], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       
-      // Abrir em nova aba com o nome do arquivo original
       const link = document.createElement('a');
       link.href = url;
       link.target = '_blank';
       link.click();
       
-      // Limpeza de memória após um tempo
       setTimeout(() => URL.revokeObjectURL(url), 10000);
 
     } catch (err) {
@@ -224,6 +220,21 @@ const GoalCard = ({ entry, plans, activeId, setActiveId, setSeconds, isOverdue =
   const goal = topic?.goals.find((g: any) => g.id === entry.goalId);
   const isComp = entry.status === 'COMPLETED';
 
+  // Mapeamento de rótulos amigáveis para o tipo
+  const getLabel = () => {
+    if (entry.isReview) return 'REVISÃO';
+    switch (goal?.type) {
+      case GoalType.CLASS: return 'AULA';
+      case GoalType.MATERIAL: return 'MATERIAL';
+      case GoalType.QUESTIONS: return 'QUESTÕES';
+      case GoalType.LEI_SECA: return 'LEI SECA';
+      case GoalType.SUMMARY: return 'RESUMO';
+      default: return goal?.type || 'ESTUDO';
+    }
+  };
+
+  const label = getLabel();
+
   return (
     <div className={`bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 flex flex-col transition-all duration-500 ${isComp ? 'opacity-30' : 'hover:border-red-600/40 shadow-2xl group/card'}`}>
       <div className="flex flex-col md:flex-row items-center justify-between gap-8">
@@ -234,6 +245,13 @@ const GoalCard = ({ entry, plans, activeId, setActiveId, setSeconds, isOverdue =
           <div className="space-y-2 flex-1 overflow-hidden">
             <div className="flex items-center gap-3">
               <span className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600">{discipline?.name}</span>
+              {/* BADGE DE TIPO DE META */}
+              <span 
+                className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border transition-all ${entry.isReview ? 'bg-red-600/10 border-red-600/30 text-red-500' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}
+                style={!entry.isReview ? { borderColor: `${goal?.color}30`, color: goal?.color } : {}}
+              >
+                {label}
+              </span>
               {isOverdue && <span className="bg-red-600 text-white px-2 py-0.5 rounded text-[8px] font-black">ATRASADA</span>}
             </div>
             <h4 className="text-2xl font-black text-zinc-100 truncate uppercase tracking-tighter">{topic?.title}</h4>
