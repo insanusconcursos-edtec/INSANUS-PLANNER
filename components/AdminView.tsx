@@ -7,12 +7,12 @@ import {
   Users, Search, X, Save, Layers, Settings2, ExternalLink,
   ShieldCheck, CheckCircle2, AlertCircle, Send, UserPlus,
   Key, Mail, Fingerprint, Eye, Upload, Edit, GripVertical, 
-  User as UserIcon, Lock, FileUp, Info
+  User as UserIcon, Lock, FileUp, Info, ChevronRight, Video
 } from 'lucide-react';
 import { 
   StudyPlan, Discipline, Topic, Goal, GoalType, 
   CycleSystem, StudyCycle, Folder, RegisteredUser, 
-  PlanAccess, CycleItem 
+  PlanAccess, CycleItem, SubGoal
 } from '../types.ts';
 import { GOAL_COLORS } from '../constants.tsx';
 import { db } from '../firebase.ts';
@@ -34,12 +34,20 @@ const AdminView: React.FC<AdminViewProps> = ({ plans, users, updateUsers, logoUr
   const [syncing, setSyncing] = useState(false);
   const [isAddingUser, setIsAddingUser] = useState(false);
   const [newUser, setNewUser] = useState({ name: '', email: '', cpf: '', password: '' });
+  const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
   
   const logoInputRef = useRef<HTMLInputElement>(null);
   const planImageInputRef = useRef<HTMLInputElement>(null);
   const [isEditingGoal, setIsEditingGoal] = useState<{ dId: string, tId: string, gId: string | null } | null>(null);
 
   const activePlan = plans.find(p => p.id === selectedPlanId);
+
+  const toggleFolder = (id: string) => {
+    const newSet = new Set(collapsedFolders);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setCollapsedFolders(newSet);
+  };
 
   const savePlan = async (plan: StudyPlan) => {
     const sanitizedPlan = JSON.parse(JSON.stringify(plan));
@@ -226,7 +234,6 @@ const AdminView: React.FC<AdminViewProps> = ({ plans, users, updateUsers, logoUr
                         }
                       }} />
                     </div>
-                    {/* AVISO DE TAMANHO CAPA */}
                     <div className="flex items-start gap-2 bg-red-600/5 border border-red-600/10 p-3 rounded-2xl animate-pulse">
                       <AlertCircle size={14} className="text-red-500 shrink-0 mt-0.5" />
                       <div className="text-[9px] font-bold text-zinc-400 leading-tight uppercase tracking-wider">
@@ -329,29 +336,38 @@ const AdminView: React.FC<AdminViewProps> = ({ plans, users, updateUsers, logoUr
                       }} className="bg-zinc-800 hover:bg-zinc-700 text-white text-[10px] font-black uppercase px-6 py-3 rounded-2xl border border-zinc-700 transition-all">+ Nova Pasta</button>
                    </div>
                    
-                   {activePlan.folders.sort((a,b) => a.order - b.order).map((folder, fIdx) => (
-                     <div key={folder.id} className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 space-y-6">
-                        <div className="flex items-center justify-between border-b border-zinc-800 pb-6">
-                           <div className="flex items-center gap-4">
-                              <div className="flex flex-col">
-                                 <button onClick={() => handleMoveFolder(folder.id, 'up')} className="text-zinc-700 hover:text-white"><ChevronUp size={14} /></button>
-                                 <button onClick={() => handleMoveFolder(folder.id, 'down')} className="text-zinc-700 hover:text-white"><ChevronDown size={14} /></button>
-                              </div>
-                              <input value={folder.name} onChange={(e) => savePlan({ ...activePlan, folders: activePlan.folders.map(f => f.id === folder.id ? { ...f, name: e.target.value } : f) })} className="bg-transparent font-black text-white uppercase text-lg outline-none focus:text-red-500" />
-                           </div>
-                           <button onClick={() => savePlan({ ...activePlan, folders: activePlan.folders.filter(f => f.id !== folder.id) })} className="text-zinc-700 hover:text-red-500"><Trash2 size={18} /></button>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                           {activePlan.disciplines.filter(d => d.folderId === folder.id).sort((a,b) => a.order - b.order).map(disc => (
-                             <DisciplineNode key={disc.id} disc={disc} activePlan={activePlan} savePlan={savePlan} setIsEditingGoal={setIsEditingGoal} onMove={(dir) => handleMoveDiscipline(disc.id, dir)} />
-                           ))}
-                           <button onClick={() => {
-                             const newD: Discipline = { id: Math.random().toString(36).substr(2, 9), name: 'Nova Disciplina', topics: [], folderId: folder.id, order: activePlan.disciplines.length };
-                             savePlan({ ...activePlan, disciplines: [...activePlan.disciplines, newD] });
-                           }} className="h-full min-h-[100px] border-2 border-dashed border-zinc-800 rounded-[2rem] flex items-center justify-center text-zinc-700 hover:text-red-500 font-black uppercase text-[10px] tracking-widest transition-all">+ Nova Disciplina</button>
-                        </div>
-                     </div>
-                   ))}
+                   {activePlan.folders.sort((a,b) => a.order - b.order).map((folder, fIdx) => {
+                     const isCollapsed = collapsedFolders.has(folder.id);
+                     return (
+                      <div key={folder.id} className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 space-y-6 transition-all duration-300">
+                          <div className={`flex items-center justify-between ${!isCollapsed ? 'border-b border-zinc-800 pb-6' : ''}`}>
+                            <div className="flex items-center gap-4">
+                                <button onClick={() => toggleFolder(folder.id)} className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-500 transition-all">
+                                  {isCollapsed ? <ChevronRight size={20} /> : <ChevronDown size={20} />}
+                                </button>
+                                <div className="flex flex-col">
+                                  <button onClick={() => handleMoveFolder(folder.id, 'up')} className="text-zinc-700 hover:text-white"><ChevronUp size={14} /></button>
+                                  <button onClick={() => handleMoveFolder(folder.id, 'down')} className="text-zinc-700 hover:text-white"><ChevronDown size={14} /></button>
+                                </div>
+                                <input value={folder.name} onChange={(e) => savePlan({ ...activePlan, folders: activePlan.folders.map(f => f.id === folder.id ? { ...f, name: e.target.value } : f) })} className="bg-transparent font-black text-white uppercase text-lg outline-none focus:text-red-500" />
+                            </div>
+                            <button onClick={() => savePlan({ ...activePlan, folders: activePlan.folders.filter(f => f.id !== folder.id) })} className="text-zinc-700 hover:text-red-500"><Trash2 size={18} /></button>
+                          </div>
+                          
+                          {!isCollapsed && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in slide-in-from-top-2 duration-300">
+                                {activePlan.disciplines.filter(d => d.folderId === folder.id).sort((a,b) => a.order - b.order).map(disc => (
+                                  <DisciplineNode key={disc.id} disc={disc} activePlan={activePlan} savePlan={savePlan} setIsEditingGoal={setIsEditingGoal} onMove={(dir) => handleMoveDiscipline(disc.id, dir)} />
+                                ))}
+                                <button onClick={() => {
+                                  const newD: Discipline = { id: Math.random().toString(36).substr(2, 9), name: 'Nova Disciplina', topics: [], folderId: folder.id, order: activePlan.disciplines.length };
+                                  savePlan({ ...activePlan, disciplines: [...activePlan.disciplines, newD] });
+                                }} className="h-full min-h-[100px] border-2 border-dashed border-zinc-800 rounded-[2rem] flex items-center justify-center text-zinc-700 hover:text-red-500 font-black uppercase text-[10px] tracking-widest transition-all">+ Nova Disciplina</button>
+                            </div>
+                          )}
+                      </div>
+                     );
+                   })}
 
                    <div className="space-y-6">
                       <h4 className="text-[10px] font-black text-zinc-700 uppercase tracking-[0.4em] px-4">Independentes</h4>
@@ -474,7 +490,6 @@ const AdminView: React.FC<AdminViewProps> = ({ plans, users, updateUsers, logoUr
                         }
                     }} />
                  </div>
-                 {/* AVISO DE TAMANHO LOGO */}
                  <div className="flex items-start gap-3 bg-zinc-950 border border-zinc-800 p-4 rounded-2xl max-w-sm">
                     <Info size={18} className="text-red-600 shrink-0" />
                     <div className="text-left">
@@ -517,6 +532,16 @@ const AdminView: React.FC<AdminViewProps> = ({ plans, users, updateUsers, logoUr
 };
 
 const DisciplineNode = ({ disc, activePlan, savePlan, setIsEditingGoal, onMove }: any) => {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [collapsedTopics, setCollapsedTopics] = useState<Set<string>>(new Set());
+
+  const toggleTopic = (id: string) => {
+    const newSet = new Set(collapsedTopics);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setCollapsedTopics(newSet);
+  };
+
   const handleMoveTopic = (tIdx: number, dir: 'up' | 'down') => {
     const newList = [...disc.topics];
     const targetIdx = dir === 'up' ? tIdx - 1 : tIdx + 1;
@@ -544,9 +569,12 @@ const DisciplineNode = ({ disc, activePlan, savePlan, setIsEditingGoal, onMove }
   };
 
   return (
-    <div className="bg-zinc-950 border border-zinc-800 rounded-[2rem] p-6 space-y-6 hover:border-zinc-700 transition-colors">
-      <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
+    <div className="bg-zinc-950 border border-zinc-800 rounded-[2rem] p-6 space-y-6 hover:border-zinc-700 transition-all duration-300">
+      <div className={`flex items-center justify-between ${!isCollapsed ? 'border-b border-zinc-800 pb-4' : ''}`}>
         <div className="flex items-center gap-3">
+           <button onClick={() => setIsCollapsed(!isCollapsed)} className="p-1.5 hover:bg-zinc-900 rounded-lg text-zinc-500 transition-all">
+             {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+           </button>
            <div className="flex flex-col">
               <button onClick={() => onMove('up')} className="text-zinc-800 hover:text-white"><ChevronUp size={12} /></button>
               <button onClick={() => onMove('down')} className="text-zinc-800 hover:text-white"><ChevronDown size={12} /></button>
@@ -562,53 +590,87 @@ const DisciplineNode = ({ disc, activePlan, savePlan, setIsEditingGoal, onMove }
         </div>
       </div>
       
-      <div className="space-y-4">
-         {disc.topics.sort((a: any, b: any) => a.order - b.order).map((topic: any, tIdx: number) => (
-           <div key={topic.id} className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                 <div className="flex items-center gap-2">
-                    <div className="flex flex-col">
-                      <button onClick={() => handleMoveTopic(tIdx, 'up')} className="text-zinc-800 hover:text-red-500"><ChevronUp size={10} /></button>
-                      <button onClick={() => handleMoveTopic(tIdx, 'down')} className="text-zinc-800 hover:text-red-500"><ChevronDown size={10} /></button>
+      {!isCollapsed && (
+        <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+          {disc.topics.sort((a: any, b: any) => a.order - b.order).map((topic: any, tIdx: number) => {
+            const topicCollapsed = collapsedTopics.has(topic.id);
+            return (
+              <div key={topic.id} className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 space-y-3 transition-all duration-300">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => toggleTopic(topic.id)} className="p-1 hover:bg-zinc-800 rounded text-zinc-600 transition-all">
+                          {topicCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                        </button>
+                        <div className="flex flex-col">
+                          <button onClick={() => handleMoveTopic(tIdx, 'up')} className="text-zinc-800 hover:text-red-500"><ChevronUp size={10} /></button>
+                          <button onClick={() => handleMoveTopic(tIdx, 'down')} className="text-zinc-800 hover:text-red-500"><ChevronDown size={10} /></button>
+                        </div>
+                        <div className="flex-1">
+                          <textarea 
+                            rows={1}
+                            value={topic.title} 
+                            onChange={(e) => {
+                              savePlan({ ...activePlan, disciplines: activePlan.disciplines.map((d: any) => d.id === disc.id ? { ...d, topics: d.topics.map((t: any) => t.id === topic.id ? { ...t, title: e.target.value } : t) } : d) });
+                              e.target.style.height = 'auto';
+                              e.target.style.height = e.target.scrollHeight + 'px';
+                            }}
+                            className="bg-transparent font-bold text-zinc-400 text-[10px] uppercase outline-none focus:text-white transition-colors w-full resize-none whitespace-normal break-words leading-relaxed overflow-hidden py-1"
+                            onFocus={(e) => {
+                              e.target.style.height = 'auto';
+                              e.target.style.height = e.target.scrollHeight + 'px';
+                            }}
+                          />
+                        </div>
                     </div>
-                    <input value={topic.title} onChange={(e) => savePlan({ ...activePlan, disciplines: activePlan.disciplines.map((d: any) => d.id === disc.id ? { ...d, topics: d.topics.map((t: any) => t.id === topic.id ? { ...t, title: e.target.value } : t) } : d) })} className="bg-transparent font-bold text-zinc-400 text-[10px] uppercase outline-none focus:text-white transition-colors" />
-                 </div>
-                 <div className="flex items-center gap-2">
-                    <button onClick={() => setIsEditingGoal({ dId: disc.id, tId: topic.id, gId: null })} className="text-red-500 hover:scale-110 transition-transform"><Plus size={14} /></button>
-                    <button onClick={() => savePlan({ ...activePlan, disciplines: activePlan.disciplines.map((d: any) => d.id === disc.id ? { ...d, topics: d.topics.filter((t: any) => t.id !== topic.id) } : d) })} className="text-zinc-800 hover:text-red-500"><X size={12} /></button>
-                 </div>
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => setIsEditingGoal({ dId: disc.id, tId: topic.id, gId: null })} className="text-red-500 hover:scale-110 transition-transform"><Plus size={14} /></button>
+                        <button onClick={() => savePlan({ ...activePlan, disciplines: activePlan.disciplines.map((d: any) => d.id === disc.id ? { ...d, topics: d.topics.filter((t: any) => t.id !== topic.id) } : d) })} className="text-zinc-800 hover:text-red-500"><X size={12} /></button>
+                    </div>
+                  </div>
+                  
+                  {!topicCollapsed && (
+                    <div className="space-y-1.5 animate-in slide-in-from-top-1 duration-200">
+                        {topic.goals.sort((a: any, b: any) => a.order - b.order).map((goal: any, gIdx: number) => (
+                          <div key={goal.id} className="flex items-center gap-2">
+                              <div className="flex flex-col">
+                                <button onClick={() => handleMoveGoal(topic.id, gIdx, 'up')} className="text-zinc-900 hover:text-red-500"><ChevronUp size={8} /></button>
+                                <button onClick={() => handleMoveGoal(topic.id, gIdx, 'down')} className="text-zinc-900 hover:text-red-500"><ChevronDown size={8} /></button>
+                              </div>
+                              <button onClick={() => setIsEditingGoal({ dId: disc.id, tId: topic.id, gId: goal.id })} className="flex-1 flex items-center justify-between px-3 py-1.5 rounded-lg border border-zinc-800 transition-all text-left" style={{ backgroundColor: `${goal.color}10`, borderColor: `${goal.color}20` }}>
+                                <span className="text-[8px] font-black uppercase whitespace-normal break-words leading-tight pr-2" style={{ color: goal.color }}>{goal.type}: {goal.title}</span>
+                                <Edit size={10} className="text-zinc-800 shrink-0" />
+                              </button>
+                          </div>
+                        ))}
+                    </div>
+                  )}
               </div>
-              <div className="space-y-1.5">
-                 {topic.goals.sort((a: any, b: any) => a.order - b.order).map((goal: any, gIdx: number) => (
-                   <div key={goal.id} className="flex items-center gap-2">
-                      <div className="flex flex-col">
-                        <button onClick={() => handleMoveGoal(topic.id, gIdx, 'up')} className="text-zinc-900 hover:text-red-500"><ChevronUp size={8} /></button>
-                        <button onClick={() => handleMoveGoal(topic.id, gIdx, 'down')} className="text-zinc-900 hover:text-red-500"><ChevronDown size={8} /></button>
-                      </div>
-                      <button onClick={() => setIsEditingGoal({ dId: disc.id, tId: topic.id, gId: goal.id })} className="flex-1 flex items-center justify-between px-3 py-1.5 rounded-lg border border-zinc-800 transition-all text-left truncate" style={{ backgroundColor: `${goal.color}10`, borderColor: `${goal.color}20` }}>
-                        <span className="text-[8px] font-black uppercase" style={{ color: goal.color }}>{goal.type}: {goal.title}</span>
-                        <Edit size={10} className="text-zinc-800" />
-                      </button>
-                   </div>
-                 ))}
-              </div>
-           </div>
-         ))}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
 
 const GoalEditorModal = ({ activePlan, context, onClose, onSave }: any) => {
   const existingGoal = context.gId ? activePlan.disciplines.find((d: any) => d.id === context.dId)?.topics.find((t: any) => t.id === context.tId)?.goals.find((g: any) => g.id === context.gId) : null;
-  const [goal, setGoal] = useState<Goal>(existingGoal || { id: Math.random().toString(36).substr(2, 9), type: GoalType.CLASS, title: 'Nova Meta', color: GOAL_COLORS[0], order: 0, links: [], reviewConfig: { enabled: false, intervals: [1, 7, 15, 30], repeatLast: false }, observations: '', multiplier: 1, articles: '', pdfData: '', pdfName: '' });
+  const [goal, setGoal] = useState<Goal>(existingGoal || { id: Math.random().toString(36).substr(2, 9), type: GoalType.CLASS, title: 'Nova Meta', color: GOAL_COLORS[0], order: 0, links: [], reviewConfig: { enabled: false, intervals: [1, 7, 15, 30], repeatLast: false }, observations: '', multiplier: 1, articles: '', pdfData: '', pdfName: '', subGoals: [] });
   const [linkInput, setLinkInput] = useState('');
   const [intervalsInput, setIntervalsInput] = useState(goal.reviewConfig?.intervals.join(', ') || '1, 7, 15, 30');
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
+  // Estados para submetas
+  const [newSubGoal, setNewSubGoal] = useState({ title: '', minutes: 0, link: '' });
+
   const handleSave = () => {
     const intervals = intervalsInput.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
-    onSave(context.dId, context.tId, { ...goal, reviewConfig: { ...goal.reviewConfig!, intervals } });
+    // Se for aula, calcular minutagem total antes de salvar
+    let finalGoal = { ...goal, reviewConfig: { ...goal.reviewConfig!, intervals } };
+    if (goal.type === GoalType.CLASS) {
+      finalGoal.minutes = (goal.subGoals || []).reduce((acc, sub) => acc + sub.minutes, 0);
+    }
+    onSave(context.dId, context.tId, finalGoal);
   };
 
   const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -624,6 +686,23 @@ const GoalEditorModal = ({ activePlan, context, onClose, onSave }: any) => {
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const addSubGoal = () => {
+    if (!newSubGoal.title || newSubGoal.minutes <= 0) return;
+    const sub: SubGoal = {
+      id: Math.random().toString(36).substr(2, 9),
+      title: newSubGoal.title,
+      minutes: newSubGoal.minutes,
+      link: newSubGoal.link,
+      order: (goal.subGoals || []).length
+    };
+    setGoal({ ...goal, subGoals: [...(goal.subGoals || []), sub] });
+    setNewSubGoal({ title: '', minutes: 0, link: '' });
+  };
+
+  const removeSubGoal = (id: string) => {
+    setGoal({ ...goal, subGoals: (goal.subGoals || []).filter(s => s.id !== id) });
   };
 
   return (
@@ -650,24 +729,60 @@ const GoalEditorModal = ({ activePlan, context, onClose, onSave }: any) => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Esforço Estimado</label>
-              <div className="bg-zinc-950 border border-zinc-800 rounded-2xl px-5 py-4 flex items-center gap-4">
-                {(goal.type === GoalType.CLASS || goal.type === GoalType.SUMMARY) ? (
-                  <> <Clock size={16} className="text-zinc-700" /> <input type="number" value={goal.minutes || ""} onChange={e => setGoal({...goal, minutes: Number(e.target.value)})} className="bg-transparent text-white font-black outline-none w-full" placeholder="Minutos" /> </>
-                ) : (
-                  <> <FileText size={16} className="text-zinc-700" /> <input type="number" value={goal.pages || ""} onChange={e => setGoal({...goal, pages: Number(e.target.value)})} className="bg-transparent text-white font-black outline-none w-full" placeholder="Páginas" /> </>
-                )}
-              </div>
+          {goal.type === GoalType.CLASS ? (
+            <div className="bg-zinc-950 border border-zinc-800 rounded-[2rem] p-6 space-y-6">
+               <div className="flex items-center justify-between">
+                  <h5 className="text-[10px] font-black text-red-500 uppercase tracking-widest flex items-center gap-2">
+                    <Video size={16} /> Cadastro de Submetas de Aulas
+                  </h5>
+                  <span className="text-white font-black text-xs">Total: {(goal.subGoals || []).reduce((a,b) => a+b.minutes, 0)} min</span>
+               </div>
+               
+               <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
+                    <input value={newSubGoal.title} onChange={e => setNewSubGoal({...newSubGoal, title: e.target.value})} placeholder="Nome da Aula" className="md:col-span-5 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-white text-[10px] font-bold outline-none" />
+                    <input type="number" value={newSubGoal.minutes || ""} onChange={e => setNewSubGoal({...newSubGoal, minutes: Number(e.target.value)})} placeholder="Min" className="md:col-span-2 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-white text-[10px] font-bold outline-none" />
+                    <input value={newSubGoal.link} onChange={e => setNewSubGoal({...newSubGoal, link: e.target.value})} placeholder="Link da Aula" className="md:col-span-4 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-white text-[10px] font-bold outline-none" />
+                    <button onClick={addSubGoal} className="md:col-span-1 bg-red-600 text-white rounded-xl flex items-center justify-center hover:bg-red-700"><Plus size={18} /></button>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    {(goal.subGoals || []).sort((a,b) => a.order - b.order).map((sub) => (
+                      <div key={sub.id} className="flex items-center justify-between bg-zinc-900/50 border border-zinc-800/50 p-3 rounded-xl">
+                        <div className="flex items-center gap-4">
+                           <div className="text-[9px] font-black text-zinc-600">{sub.minutes}M</div>
+                           <input 
+                             value={sub.title} 
+                             onChange={(e) => setGoal({ ...goal, subGoals: (goal.subGoals || []).map(s => s.id === sub.id ? { ...s, title: e.target.value } : s) })}
+                             className="bg-transparent text-white text-[10px] font-black uppercase outline-none focus:text-red-500"
+                           />
+                        </div>
+                        <button onClick={() => removeSubGoal(sub.id)} className="text-zinc-800 hover:text-red-500"><Trash2 size={14} /></button>
+                      </div>
+                    ))}
+                  </div>
+               </div>
             </div>
-            {goal.type === GoalType.LEI_SECA && (
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Fator Multiplicador (Releitura)</label>
-                <input type="number" min="1" max="5" value={goal.multiplier || 1} onChange={e => setGoal({...goal, multiplier: Number(e.target.value)})} className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-red-600" />
+                <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Esforço Estimado</label>
+                <div className="bg-zinc-950 border border-zinc-800 rounded-2xl px-5 py-4 flex items-center gap-4">
+                  {goal.type === GoalType.SUMMARY ? (
+                    <> <Clock size={16} className="text-zinc-700" /> <input type="number" value={goal.minutes || ""} onChange={e => setGoal({...goal, minutes: Number(e.target.value)})} className="bg-transparent text-white font-black outline-none w-full" placeholder="Minutos" /> </>
+                  ) : (
+                    <> <FileText size={16} className="text-zinc-700" /> <input type="number" value={goal.pages || ""} onChange={e => setGoal({...goal, pages: Number(e.target.value)})} className="bg-transparent text-white font-black outline-none w-full" placeholder="Páginas" /> </>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
+              {goal.type === GoalType.LEI_SECA && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Fator Multiplicador (Releitura)</label>
+                  <input type="number" min="1" max="5" value={goal.multiplier || 1} onChange={e => setGoal({...goal, multiplier: Number(e.target.value)})} className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-red-600" />
+                </div>
+              )}
+            </div>
+          )}
 
           {(goal.type === GoalType.MATERIAL || goal.type === GoalType.QUESTIONS) && (
             <div className="space-y-4">
@@ -695,21 +810,23 @@ const GoalEditorModal = ({ activePlan, context, onClose, onSave }: any) => {
             </div>
           )}
 
-          <div className="space-y-4">
-            <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Links de Redirecionamento</label>
-            <div className="flex gap-2">
-               <input value={linkInput} onChange={e => setLinkInput(e.target.value)} placeholder="https://..." className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white text-xs outline-none" />
-               <button onClick={() => { if(linkInput) { setGoal({...goal, links: [...goal.links, linkInput]}); setLinkInput(""); } }} className="bg-red-600 text-white p-3 rounded-xl"><Plus size={18} /></button>
+          {goal.type !== GoalType.CLASS && (
+            <div className="space-y-4">
+              <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Links de Redirecionamento</label>
+              <div className="flex gap-2">
+                 <input value={linkInput} onChange={e => setLinkInput(e.target.value)} placeholder="https://..." className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white text-xs outline-none" />
+                 <button onClick={() => { if(linkInput) { setGoal({...goal, links: [...goal.links, linkInput]}); setLinkInput(""); } }} className="bg-red-600 text-white p-3 rounded-xl"><Plus size={18} /></button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {goal.links.map((link, i) => (
+                  <div key={i} className="bg-zinc-950 border border-zinc-800 px-3 py-1 rounded-lg flex items-center gap-2">
+                    <span className="text-[8px] text-zinc-500 truncate max-w-[150px]">{link}</span>
+                    <button onClick={() => setGoal({...goal, links: goal.links.filter((_, idx) => idx !== i)})} className="text-zinc-700 hover:text-red-500"><X size={10} /></button>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {goal.links.map((link, i) => (
-                <div key={i} className="bg-zinc-950 border border-zinc-800 px-3 py-1 rounded-lg flex items-center gap-2">
-                  <span className="text-[8px] text-zinc-500 truncate max-w-[150px]">{link}</span>
-                  <button onClick={() => setGoal({...goal, links: goal.links.filter((_, idx) => idx !== i)})} className="text-zinc-700 hover:text-red-500"><X size={10} /></button>
-                </div>
-              ))}
-            </div>
-          </div>
+          )}
 
           <div className="bg-zinc-950 border border-zinc-800 rounded-[2rem] p-6 space-y-6">
              <div className="flex items-center justify-between">
@@ -725,7 +842,7 @@ const GoalEditorModal = ({ activePlan, context, onClose, onSave }: any) => {
                     <input value={intervalsInput} onChange={e => setIntervalsInput(e.target.value)} placeholder="1, 7, 15, 30" className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-white font-mono text-xs outline-none" />
                   </div>
                   <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" checked={goal.repeatLast || goal.reviewConfig.repeatLast} onChange={e => setGoal({...goal, reviewConfig: {...goal.reviewConfig!, repeatLast: e.target.checked}})} className="w-4 h-4 rounded border-zinc-800 bg-zinc-900 text-red-600" />
+                    <input type="checkbox" checked={goal.repeatLast || (goal.reviewConfig && goal.reviewConfig.repeatLast)} onChange={e => setGoal({...goal, reviewConfig: {...goal.reviewConfig!, repeatLast: e.target.checked}})} className="w-4 h-4 rounded border-zinc-800 bg-zinc-900 text-red-600" />
                     <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Repetir último indicador infinitamente</span>
                   </label>
                </div>

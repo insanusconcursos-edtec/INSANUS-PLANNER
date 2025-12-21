@@ -7,11 +7,11 @@ import {
   GoalType, 
   CycleSystem,
   UserProfile,
-  CycleItem
+  CycleItem,
+  SubGoal
 } from '../types';
 import { PROFILE_SPEEDS } from '../constants';
 
-// Helper para obter data local YYYY-MM-DD
 export const getLocalDateString = (date: Date): string => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -20,7 +20,12 @@ export const getLocalDateString = (date: Date): string => {
 };
 
 const calculateGoalDuration = (goal: Goal, profile: UserProfile): number => {
-  if (goal.type === GoalType.CLASS || goal.type === GoalType.SUMMARY) {
+  if (goal.type === GoalType.CLASS) {
+    // Para metas de aula, a duração agora vem da soma das submetas
+    return (goal.subGoals || []).reduce((acc, sub) => acc + sub.minutes, 0);
+  }
+  
+  if (goal.type === GoalType.SUMMARY) {
     return goal.minutes || 0;
   }
   
@@ -50,10 +55,14 @@ const getOrderedDisciplineIdsFromCycle = (plan: StudyPlan, items: CycleItem[]): 
   return [...new Set(ids)];
 };
 
-/**
- * Gera ou Replaneja o cronograma.
- * Se mode === 'replan', ele ignora datas passadas para itens não concluídos e joga tudo pra frente.
- */
+// Interface auxiliar para planificar a fila de trabalho
+interface WorkUnit {
+  goal: Goal;
+  subGoal?: SubGoal;
+  topicId: string;
+  disciplineId: string;
+}
+
 export const generatePlanning = (
   plan: StudyPlan,
   routine: UserRoutine,
@@ -64,16 +73,15 @@ export const generatePlanning = (
   if (!plan || !plan.cycles.length) return [];
 
   const todayStr = getLocalDateString(new Date());
-
-  // 1. Identificar Metas Concluídas e Metas de Revisão já agendadas para o futuro
-  // Se for REPLAN, mantemos apenas COMPLETED e descartamos PENDING do futuro para recriar
   const completedEntries = existingPlanning.filter(e => e.status === 'COMPLETED');
-  const completedGoalIds = new Set(completedEntries.filter(e => !e.isReview).map(e => e.goalId));
+  // Se for aula, checamos a conclusão por subGoalId
+  const completedSubGoalIds = new Set(completedEntries.filter(e => e.subGoalId).map(e => e.subGoalId));
+  const completedGoalIds = new Set(completedEntries.filter(e => !e.isReview && !e.subGoalId).map(e => e.goalId));
   
-  // 2. Extrair Ordem de Metas do Plano
   const sortedCycles = [...plan.cycles].sort((a, b) => a.order - b.order);
-  const allOrderedGoals: { goal: Goal; topicId: string; disciplineId: string }[] = [];
+  const rawOrderedGoals: { goal: Goal; topicId: string; disciplineId: string }[] = [];
 
+  // 1. Extrair ordem de metas original do plano
   if (plan.cycleSystem === CycleSystem.CONTINUOUS) {
     sortedCycles.forEach(cycle => {
       const disciplineIds = getOrderedDisciplineIdsFromCycle(plan, cycle.items);
@@ -82,7 +90,7 @@ export const generatePlanning = (
         if (discipline) {
           [...discipline.topics].sort((a, b) => a.order - b.order).forEach(topic => {
             [...topic.goals].sort((a, b) => a.order - b.order).forEach(goal => {
-              allOrderedGoals.push({ goal, topicId: topic.id, disciplineId: dId });
+              rawOrderedGoals.push({ goal, topicId: topic.id, disciplineId: dId });
             });
           });
         }
@@ -107,7 +115,7 @@ export const generatePlanning = (
               hasMore = true;
               topicsBatch.forEach(topic => {
                 [...topic.goals].sort((a, b) => a.order - b.order).forEach(goal => {
-                  allOrderedGoals.push({ goal, topicId: topic.id, disciplineId: dId });
+                  rawOrderedGoals.push({ goal, topicId: topic.id, disciplineId: dId });
                 });
               });
               topicOffsets[dId] = start + topicsBatch.length;
@@ -118,25 +126,40 @@ export const generatePlanning = (
     }
   }
 
-  // 3. Filtrar apenas as metas que ainda não foram concluídas
-  const pendingGoals = allOrderedGoals.filter(item => !completedGoalIds.has(item.goal.id));
+  // 2. Expandir Metas de Aula em WorkUnits individuais (Submetas)
+  const workQueue: WorkUnit[] = [];
+  rawOrderedGoals.forEach(item => {
+    if (item.goal.type === GoalType.CLASS && item.goal.subGoals && item.goal.subGoals.length > 0) {
+      // Ordenar submetas
+      const subs = [...item.goal.subGoals].sort((a, b) => a.order - b.order);
+      subs.forEach(sub => {
+        if (!completedSubGoalIds.has(sub.id)) {
+          workQueue.push({ ...item, subGoal: sub });
+        }
+      });
+    } else {
+      if (!completedGoalIds.has(item.goal.id)) {
+        workQueue.push(item);
+      }
+    }
+  });
 
-  // 4. Iniciar Distribuição
+  // 3. Distribuição Inteligente
   let cursorDate = new Date(startDate);
   cursorDate.setHours(0, 0, 0, 0);
   
   const finalPlanning: PlanningEntry[] = [...completedEntries];
   
-  // Adicionar as revisões que já existem e são futuras ou de hoje
+  // Incluir revisões agendadas
   const existingReviews = existingPlanning.filter(e => e.isReview && (getLocalDateString(new Date(e.date)) >= todayStr || e.status === 'COMPLETED'));
   existingReviews.forEach(r => {
     if (!finalPlanning.find(f => f.id === r.id)) finalPlanning.push(r);
   });
 
-  let pendingIdx = 0;
+  let workIdx = 0;
   let carryOverMinutes = 0;
 
-  while (pendingIdx < pendingGoals.length) {
+  while (workIdx < workQueue.length) {
     const dow = cursorDate.getDay();
     const currentDayStr = getLocalDateString(cursorDate);
     const capacity = routine.days[dow] || 0;
@@ -147,22 +170,40 @@ export const generatePlanning = (
     }
 
     let spentToday = 0;
-    
-    // Contabilizar tempo de metas que JÁ ESTÃO agendadas para este dia (Concluídas ou Revisões)
-    const alreadyScheduled = finalPlanning.filter(e => getLocalDateString(new Date(e.date)) === currentDayStr);
-    alreadyScheduled.forEach(e => spentToday += e.durationMinutes);
+    const dayEntries = finalPlanning.filter(e => getLocalDateString(new Date(e.date)) === currentDayStr);
+    dayEntries.forEach(e => spentToday += e.durationMinutes);
 
-    while (spentToday < capacity && pendingIdx < pendingGoals.length) {
-      const { goal, topicId, disciplineId } = pendingGoals[pendingIdx];
-      const fullTime = calculateGoalDuration(goal, routine.profile);
-      const remainingForGoal = carryOverMinutes > 0 ? carryOverMinutes : fullTime;
+    while (spentToday < capacity && workIdx < workQueue.length) {
+      const unit = workQueue[workIdx];
+      const { goal, subGoal, topicId, disciplineId } = unit;
       
-      const sessionDuration = Math.min(remainingForGoal, capacity - spentToday);
+      const isClass = goal.type === GoalType.CLASS && !!subGoal;
+      const fullTime = isClass ? subGoal!.minutes : calculateGoalDuration(goal, routine.profile);
+      const remainingForUnit = carryOverMinutes > 0 ? carryOverMinutes : fullTime;
+      
+      const availableCapacity = capacity - spentToday;
+
+      // LÓGICA DE NÃO FRACIONAMENTO DE AULAS
+      if (isClass && carryOverMinutes === 0) {
+        // Se a aula for maior que o tempo restante HOJE...
+        if (fullTime > availableCapacity) {
+          // ...e se a aula CABE em um dia inteiro do usuário (considerando a capacidade total do dia)
+          if (fullTime <= capacity) {
+            // Pula para o próximo dia (encerra o dia de hoje prematuramente)
+            break; 
+          }
+          // Caso a aula seja maior que a capacidade TOTAL do dia do usuário (ex: aula de 120min e aluno estuda 60min/dia)
+          // Nesse caso inevitável, permitimos o fracionamento.
+        }
+      }
+
+      const sessionDuration = Math.min(remainingForUnit, availableCapacity);
 
       if (sessionDuration > 0) {
         finalPlanning.push({
           id: Math.random().toString(36).substr(2, 9),
           goalId: goal.id,
+          subGoalId: subGoal?.id,
           topicId,
           disciplineId,
           date: cursorDate.toISOString(),
@@ -172,10 +213,10 @@ export const generatePlanning = (
         });
         
         spentToday += sessionDuration;
-        const diff = remainingForGoal - sessionDuration;
+        const diff = remainingForUnit - sessionDuration;
         
         if (diff < 0.1) {
-          pendingIdx++;
+          workIdx++;
           carryOverMinutes = 0;
         } else {
           carryOverMinutes = diff;
@@ -185,7 +226,7 @@ export const generatePlanning = (
       }
     }
     cursorDate.setDate(cursorDate.getDate() + 1);
-    if (finalPlanning.length > 5000) break; 
+    if (finalPlanning.length > 10000) break; 
   }
 
   return finalPlanning.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());

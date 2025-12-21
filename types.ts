@@ -46,13 +46,21 @@ export interface ReviewConfig {
   repeatLast: boolean;
 }
 
+export interface SubGoal {
+  id: string;
+  title: string;
+  minutes: number;
+  link: string;
+  order: number;
+}
+
 export interface Goal {
   id: string;
   type: GoalType;
   title: string;
   color: string;
   order: number;
-  minutes?: number;
+  minutes?: number; // Agora derivado para AULAS
   pages?: number;
   links: string[];
   articles?: string;
@@ -60,8 +68,9 @@ export interface Goal {
   reviewConfig?: ReviewConfig;
   referencedGoalIds?: string[];
   observations?: string;
-  pdfData?: string; // Base64 content of PDF
+  pdfData?: string;
   pdfName?: string;
+  subGoals?: SubGoal[]; // Especificamente para GoalType.CLASS
 }
 
 export interface Topic {
@@ -109,6 +118,7 @@ export interface UserRoutine {
 export interface PlanningEntry {
   id: string;
   goalId: string;
+  subGoalId?: string; // ID da aula específica se for meta de aula
   topicId: string;
   disciplineId: string;
   date: string;

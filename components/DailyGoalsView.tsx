@@ -2,9 +2,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Play, Pause, CheckCircle, ExternalLink, Timer, 
-  History, Trophy, ArrowRight, Clock, Info, ShieldAlert, RefreshCw, AlertTriangle, FileText, Loader2
+  History, Trophy, ArrowRight, Clock, Info, ShieldAlert, RefreshCw, AlertTriangle, FileText, Loader2, Video
 } from 'lucide-react';
-import { PlanningEntry, StudyPlan, RegisteredUser, GoalType } from '../types';
+import { PlanningEntry, StudyPlan, RegisteredUser, GoalType, SubGoal } from '../types';
 import { getLocalDateString } from '../services/scheduler';
 import { PDFDocument, rgb, degrees } from 'pdf-lib';
 
@@ -45,7 +45,6 @@ const DailyGoalsView: React.FC<DailyGoalsViewProps> = ({
     if (!currentUser) return;
     setIsWatermarking(true);
     try {
-      // Decode base64 para ArrayBuffer
       const base64Content = pdfData.split(',')[1] || pdfData;
       const binaryString = window.atob(base64Content);
       const bytes = new Uint8Array(binaryString.length);
@@ -59,8 +58,6 @@ const DailyGoalsView: React.FC<DailyGoalsViewProps> = ({
 
       for (const page of pages) {
         const { width, height } = page.getSize();
-        
-        // Sistema de Mosaico (Tiling) para segurança máxima
         for (let i = 0; i < 3; i++) {
           for (let j = 0; j < 3; j++) {
             page.drawText(watermarkText, {
@@ -73,7 +70,6 @@ const DailyGoalsView: React.FC<DailyGoalsViewProps> = ({
             });
           }
         }
-
         page.drawText(`Documento rastreado: ${currentUser.email} | IP registrado no servidor`, {
           x: 20,
           y: 20,
@@ -86,14 +82,11 @@ const DailyGoalsView: React.FC<DailyGoalsViewProps> = ({
       const pdfBytes = await pdfDoc.save();
       const blob = new Blob([pdfBytes], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
-      
       const link = document.createElement('a');
       link.href = url;
       link.target = '_blank';
       link.click();
-      
       setTimeout(() => URL.revokeObjectURL(url), 10000);
-
     } catch (err) {
       console.error("Erro ao processar PDF:", err);
       alert("Houve um erro ao processar a segurança do seu material. Tente novamente.");
@@ -220,7 +213,9 @@ const GoalCard = ({ entry, plans, activeId, setActiveId, setSeconds, isOverdue =
   const goal = topic?.goals.find((g: any) => g.id === entry.goalId);
   const isComp = entry.status === 'COMPLETED';
 
-  // Mapeamento de rótulos amigáveis para o tipo
+  // Buscar submeta se existir
+  const subGoal = goal?.subGoals?.find((s: SubGoal) => s.id === entry.subGoalId);
+
   const getLabel = () => {
     if (entry.isReview) return 'REVISÃO';
     switch (goal?.type) {
@@ -245,7 +240,6 @@ const GoalCard = ({ entry, plans, activeId, setActiveId, setSeconds, isOverdue =
           <div className="space-y-2 flex-1 overflow-hidden">
             <div className="flex items-center gap-3">
               <span className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600">{discipline?.name}</span>
-              {/* BADGE DE TIPO DE META */}
               <span 
                 className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border transition-all ${entry.isReview ? 'bg-red-600/10 border-red-600/30 text-red-500' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}
                 style={!entry.isReview ? { borderColor: `${goal?.color}30`, color: goal?.color } : {}}
@@ -254,7 +248,14 @@ const GoalCard = ({ entry, plans, activeId, setActiveId, setSeconds, isOverdue =
               </span>
               {isOverdue && <span className="bg-red-600 text-white px-2 py-0.5 rounded text-[8px] font-black">ATRASADA</span>}
             </div>
-            <h4 className="text-2xl font-black text-zinc-100 truncate uppercase tracking-tighter">{topic?.title}</h4>
+            
+            {/* Título: Se for aula, mostrar título da submeta */}
+            <h4 className="text-2xl font-black text-zinc-100 uppercase tracking-tighter whitespace-normal break-words leading-tight">
+              {subGoal ? subGoal.title : topic?.title}
+            </h4>
+            
+            {subGoal && <div className="text-[10px] font-black text-red-500 uppercase tracking-widest">Tópico: {topic?.title}</div>}
+
             <div className="flex flex-wrap items-center gap-6 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
               <span className="flex items-center gap-2 bg-black px-3 py-1.5 rounded-xl border border-zinc-800"><Clock size={14} className="text-red-500" /> {entry.durationMinutes} min</span>
               {entry.isReview && <span className="text-red-500 font-black">REVISÃO • ETAPA {entry.reviewStep}</span>}
@@ -272,9 +273,17 @@ const GoalCard = ({ entry, plans, activeId, setActiveId, setSeconds, isOverdue =
               Iniciar
             </button>
           )}
+          
+          {/* Renderizar links: se for aula, priorizar link da submeta */}
+          {subGoal && subGoal.link && (
+             <a href={subGoal.link} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 text-[8px] font-black text-zinc-600 hover:text-red-500 transition-colors uppercase py-2 border border-zinc-800 rounded-lg bg-zinc-950">
+                ASSISTIR AULA AGORA <Video size={12} />
+             </a>
+          )}
+          
           {goal?.links?.map((link: string, idx: number) => (
              <a key={idx} href={link} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 text-[8px] font-black text-zinc-600 hover:text-red-500 transition-colors uppercase py-1 border border-zinc-800 rounded-lg">
-                LINK EXTERNO {idx + 1} <ExternalLink size={10} />
+                LINK COMPLEMENTAR {idx + 1} <ExternalLink size={10} />
              </a>
           ))}
         </div>
