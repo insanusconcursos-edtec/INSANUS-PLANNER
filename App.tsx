@@ -9,7 +9,7 @@ import LoginView from './components/LoginView.tsx';
 import { AppState, StudyPlan, UserRoutine, PlanningEntry, RegisteredUser, Goal } from './types.ts';
 import { INITIAL_LOGO } from './constants.tsx';
 import { generatePlanning, getLocalDateString } from './services/scheduler.ts';
-import { Eye, ShieldAlert, Loader2, ExternalLink, LogOut } from 'lucide-react';
+import { Eye, ShieldAlert, Loader2, ExternalLink, LogOut, Maximize, Minimize } from 'lucide-react';
 
 import { auth, db } from './firebase.ts';
 import { 
@@ -39,6 +39,7 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'admin' | 'routine' | 'planning' | 'daily'>('daily');
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
   const [state, setState] = useState<AppState>({
     admin: { plans: [], logoUrl: INITIAL_LOGO, users: [] },
@@ -61,6 +62,25 @@ const App: React.FC = () => {
     });
     return { globalMinutes, planMinutes };
   }, [state.user.allPlannings]);
+
+  // Monitorar mudança de tela cheia (para sincronizar ícone ao apertar ESC)
+  useEffect(() => {
+    const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.error(`Erro ao tentar entrar em tela cheia: ${err.message}`);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -212,7 +232,7 @@ const App: React.FC = () => {
     </div>
   );
 
-  if (!state.auth.isAuthenticated) return <LoginView onLogin={async (e, p) => { await signInWithEmailAndPassword(auth, e, p); }} logoUrl={state.admin.logoUrl} />;
+  if (!state.auth.isAuthenticated) return <LoginView onLogin={async (email, pass) => { await signInWithEmailAndPassword(auth, email, pass); }} logoUrl={state.admin.logoUrl} />;
 
   const availablePlans = state.auth.currentUser?.role === 'ADMIN' ? state.admin.plans : state.admin.plans.filter(p => state.auth.currentUser?.accessList.some(a => a.planId === p.id));
   const activePlanning = state.user.routine.selectedPlanId ? (state.user.allPlannings[state.user.routine.selectedPlanId] || []) : [];
@@ -229,7 +249,18 @@ const App: React.FC = () => {
                <Eye size={12} /> {isPreviewMode ? 'VOLTAR AO ADMIN' : 'MODO SIMULAÇÃO'}
              </button>
            )}
-           <button onClick={() => signOut(auth)} className="bg-zinc-800 hover:bg-red-600/20 hover:text-red-500 text-white px-3 py-1.5 rounded-lg text-[9px] font-black border border-zinc-700 transition-all"><LogOut size={12} /></button>
+           {/* BOTÃO TELA CHEIA */}
+           <button 
+             onClick={toggleFullscreen} 
+             title={isFullscreen ? "Sair da Tela Cheia" : "Tela Cheia"}
+             className="bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1.5 rounded-lg text-[9px] font-black border border-zinc-700 transition-all"
+           >
+             {isFullscreen ? <Minimize size={12} /> : <Maximize size={12} />}
+           </button>
+           
+           <button onClick={() => signOut(auth)} className="bg-zinc-800 hover:bg-red-600/20 hover:text-red-500 text-white px-3 py-1.5 rounded-lg text-[9px] font-black border border-zinc-700 transition-all">
+             <LogOut size={12} />
+           </button>
          </div>
       </div>
 

@@ -7,7 +7,7 @@ import {
   Users, Search, X, Save, Layers, Settings2, ExternalLink,
   ShieldCheck, CheckCircle2, AlertCircle, Send, UserPlus,
   Key, Mail, Fingerprint, Eye, Upload, Edit, GripVertical, 
-  User as UserIcon, Lock, FileUp
+  User as UserIcon, Lock, FileUp, Info
 } from 'lucide-react';
 import { 
   StudyPlan, Discipline, Topic, Goal, GoalType, 
@@ -213,17 +213,26 @@ const AdminView: React.FC<AdminViewProps> = ({ plans, users, updateUsers, logoUr
               <div className="space-y-10">
                 <div className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 md:p-10 flex flex-col md:flex-row gap-8 shadow-2xl relative overflow-hidden">
                    <div className="absolute top-0 right-0 w-64 h-64 bg-red-600/5 blur-[100px] pointer-events-none" />
-                   <div className="w-full md:w-48 h-48 bg-black rounded-3xl overflow-hidden group relative shrink-0 border border-zinc-800">
-                    <img src={activePlan.imageUrl} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
-                    <button onClick={() => planImageInputRef.current?.click()} className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-all text-white text-[10px] font-black uppercase">Trocar Imagem</button>
-                    <input type="file" ref={planImageInputRef} className="hidden" onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if(file) {
-                        const reader = new FileReader();
-                        reader.onload = () => savePlan({ ...activePlan, imageUrl: reader.result as string });
-                        reader.readAsDataURL(file);
-                      }
-                    }} />
+                   <div className="w-full md:w-48 h-48 flex flex-col gap-4 shrink-0">
+                    <div className="w-full aspect-[2/1] bg-black rounded-3xl overflow-hidden group relative border border-zinc-800">
+                      <img src={activePlan.imageUrl} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                      <button onClick={() => planImageInputRef.current?.click()} className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-all text-white text-[10px] font-black uppercase">Trocar Capa</button>
+                      <input type="file" ref={planImageInputRef} className="hidden" onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if(file) {
+                          const reader = new FileReader();
+                          reader.onload = () => savePlan({ ...activePlan, imageUrl: reader.result as string });
+                          reader.readAsDataURL(file);
+                        }
+                      }} />
+                    </div>
+                    {/* AVISO DE TAMANHO CAPA */}
+                    <div className="flex items-start gap-2 bg-red-600/5 border border-red-600/10 p-3 rounded-2xl animate-pulse">
+                      <AlertCircle size={14} className="text-red-500 shrink-0 mt-0.5" />
+                      <div className="text-[9px] font-bold text-zinc-400 leading-tight uppercase tracking-wider">
+                        Recomendado: <span className="text-red-500">1200x600px</span> (Proporção 2:1). Alta resolução para evitar distorções.
+                      </div>
+                    </div>
                   </div>
                   <div className="flex-1 space-y-6">
                     <input 
@@ -464,6 +473,16 @@ const AdminView: React.FC<AdminViewProps> = ({ plans, users, updateUsers, logoUr
                           reader.readAsDataURL(file);
                         }
                     }} />
+                 </div>
+                 {/* AVISO DE TAMANHO LOGO */}
+                 <div className="flex items-start gap-3 bg-zinc-950 border border-zinc-800 p-4 rounded-2xl max-w-sm">
+                    <Info size={18} className="text-red-600 shrink-0" />
+                    <div className="text-left">
+                       <span className="text-[10px] font-black text-white uppercase tracking-widest block mb-1">Guia de Proporção</span>
+                       <p className="text-[9px] text-zinc-500 font-bold uppercase leading-relaxed">
+                          Recomendado: <span className="text-white">512x512px</span> (Quadrada). Formatos ideais: PNG com fundo transparente ou JPG.
+                       </p>
+                    </div>
                  </div>
                  <button onClick={() => logoInputRef.current?.click()} className="w-full bg-red-600 hover:bg-red-700 py-4.5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-red-600/20 transition-all">Trocar Logomarca</button>
               </div>
@@ -706,7 +725,7 @@ const GoalEditorModal = ({ activePlan, context, onClose, onSave }: any) => {
                     <input value={intervalsInput} onChange={e => setIntervalsInput(e.target.value)} placeholder="1, 7, 15, 30" className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-white font-mono text-xs outline-none" />
                   </div>
                   <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" checked={goal.reviewConfig.repeatLast} onChange={e => setGoal({...goal, reviewConfig: {...goal.reviewConfig!, repeatLast: e.target.checked}})} className="w-4 h-4 rounded border-zinc-800 bg-zinc-900 text-red-600" />
+                    <input type="checkbox" checked={goal.repeatLast || goal.reviewConfig.repeatLast} onChange={e => setGoal({...goal, reviewConfig: {...goal.reviewConfig!, repeatLast: e.target.checked}})} className="w-4 h-4 rounded border-zinc-800 bg-zinc-900 text-red-600" />
                     <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Repetir último indicador infinitamente</span>
                   </label>
                </div>
